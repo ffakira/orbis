@@ -8,25 +8,28 @@ O PostgreSQL é hospedado pela [Neon](https://neon.tech/), enquanto a infraestru
 
 ## Technology Stack
 
-| Categoria | Tecnologia |
-|---|---|
-| Runtime | Node.js 22 |
-| Linguagem | TypeScript |
-| HTTP Framework | Express 5 |
-| Validação | Zod 4 |
-| Banco de dados | PostgreSQL 18 |
-| ORM | Drizzle ORM |
-| Database Driver | node-postgres (`pg`) |
-| Password Hashing | Argon2id |
-| HTTP Testing | Supertest |
-| Test Framework | Vitest |
-| Integration Testing | Testcontainers |
-| Cloud Runtime | AWS Lambda |
-| API Gateway | Amazon API Gateway HTTP API |
-| Rate-limit Storage | Amazon DynamoDB |
-| Secrets Management | AWS Secrets Manager |
-| Secrets Retrieval | AWS Parameters and Secrets Lambda Extension |
-| Infrastructure as Code | Terraform |
+| Categoria              | Tecnologia                                  |
+| ---------------------- | ------------------------------------------- |
+| Runtime                | Node.js 22                                  |
+| Linguagem              | TypeScript                                  |
+| HTTP Framework         | Express 5                                   |
+| Validação              | Zod 4                                       |
+| Banco de dados         | PostgreSQL 18                               |
+| ORM                    | Drizzle ORM                                 |
+| Database Driver        | node-postgres (`pg`)                        |
+| Password Hashing       | Argon2id                                    |
+| HTTP Testing           | Supertest                                   |
+| Test Framework         | Vitest                                      |
+| Integration Testing    | Testcontainers                              |
+| Cloud Runtime          | AWS Lambda                                  |
+| API Gateway            | Amazon API Gateway HTTP API                 |
+| Rate-limit Storage     | Amazon DynamoDB                             |
+| Secrets Management     | AWS Secrets Manager                         |
+| Secrets Retrieval      | AWS Parameters and Secrets Lambda Extension |
+| Infrastructure as Code | Terraform                                   |
+| CI/CD                  | GitHub Actions                              |
+| Cloud Authentication   | AWS IAM OIDC Federation                     |
+| Terraform Backend      | Amazon S3                                   |
 
 ## Arquitetura
 
@@ -79,10 +82,10 @@ flowchart TB
 
     UseCase --> Domain
     UseCase --> Ports
-    Ports --> Adapters
+    Adapters -.->|"Implements"| Ports
     Adapters --> Neon
 
-    Lambda -.->|"Rate-limit storage integration"| DynamoDB
+    Lambda -.->|"Rate-limit integration"| DynamoDB
     Lambda --> SecretsExtension
     SecretsExtension --> SecretsManager
     Lambda --> CloudWatch
@@ -127,7 +130,7 @@ sequenceDiagram
     API-->>Client: 201 Created
 ```
 
-Caso qualquer operação de persistência falhe, a transação é revertida (*rollback*). Dessa forma, um usuário não pode ser criado sem o respectivo registro de aceite dos termos e o evento no outbox.
+Caso qualquer operação de persistência falhe, a transação é revertida (_rollback_). Dessa forma, um usuário não pode ser criado sem o respectivo registro de aceite dos termos e o evento no outbox.
 
 ### Deployment Architecture
 
@@ -157,10 +160,74 @@ flowchart TB
 
 A configuração root compõe os módulos e fornece suas dependências. Cada módulo mantém a responsabilidade pelos próprios recursos, variáveis, outputs e configurações.
 
+### Production Deployment Architecture
+
+O deployment de produção é executado através do GitHub Actions, utilizando autenticação AWS via OpenID Connect (OIDC) e aprovação explícita antes da aplicação das alterações de infraestrutura.
+
+```mermaid
+flowchart TB
+    Developer["Developer"]
+
+    subgraph GitHub["GitHub Actions"]
+        Workflow["Production Deployment"]
+        Checks["Tests and Build"]
+        Plan["Terraform Plan"]
+        Artifact[("Saved Terraform Plan")]
+        Approval["Production Environment Approval"]
+        Apply["Terraform Apply"]
+        Verify["Post-deployment Verification"]
+    end
+
+    subgraph AWS["AWS Cloud"]
+        OIDC["GitHub OIDC Provider"]
+        PlanRole["Terraform Plan IAM Role"]
+        DeployRole["Terraform Deployment IAM Role"]
+        State[("S3 Remote State")]
+        Lambda["AWS Lambda"]
+        Gateway["API Gateway"]
+        DynamoDB[("DynamoDB")]
+    end
+
+    Developer -->|"Manual workflow_dispatch"| Workflow
+    Workflow --> Checks
+    Checks --> Plan
+    Plan --> OIDC
+    OIDC --> PlanRole
+    PlanRole --> State
+    Plan --> Artifact
+    Artifact --> Approval
+    Approval --> Apply
+    Apply --> OIDC
+    OIDC --> DeployRole
+    DeployRole --> State
+    Apply --> Lambda
+    Apply --> Gateway
+    Apply --> DynamoDB
+    Apply --> Verify
+```
+
+O pipeline separa planejamento e aplicação de alterações na infraestrutura.
+
+As etapas de deployment são:
+
+1. Pre-deployment checks: instalação das dependências, execução dos testes e geração do Lambda package.
+2. Terraform initialization: inicialização do Terraform utilizando o remote S3 backend.
+3. Terraform plan: geração e armazenamento do plano de infraestrutura.
+4. Production approval: aprovação manual através do GitHub Environment `production`.
+5. Terraform apply: aplicação do saved plan previamente gerado.
+6. Post-deployment verification: verificação dos endpoints `/health` e `/ready`.
+
+O plan e o deployment utilizam IAM roles distintas, com permissões específicas para cada operação.
+
 ## Project Structure
 
 ```text
 orbis/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml
+│       ├── deploy.yml
+│       └── terraform.yml
 ├── src/
 │   ├── config/
 │   │   └── env.ts
@@ -216,20 +283,28 @@ orbis/
 └── README.md
 ```
 
-A organização do projeto é orientada por capacidades de negócio (*business capabilities*), em vez de controllers específicos de frameworks ou camadas genéricas de services.
+A organização do projeto é orientada por capacidades de negócio (_business capabilities_), em vez de controllers específicos de frameworks ou camadas genéricas de services.
 
 ## Pré-requisitos
 
-Instale as seguintes ferramentas:
+### Application Development
 
 - Node.js 22 ou superior
 - npm
 - GNU Make
 - Docker (necessário para os testes de integração com PostgreSQL)
+- Banco de dados PostgreSQL na Neon
+
+### Infrastructure Management
+
+Para operações de infraestrutura:
+
 - Terraform
 - AWS CLI
-- Conta AWS com credenciais configuradas para a região e conta de destino
-- Banco de dados PostgreSQL na Neon
+- Conta AWS com permissões IAM apropriadas
+- Acesso ao repositório GitHub
+
+Production deployments são executados pelo GitHub Actions através de autenticação AWS OIDC.
 
 Verifique as instalações:
 
@@ -314,11 +389,11 @@ O outbox garante a persistência durável dos eventos. O mecanismo de dispatch e
 
 ## API Endpoints
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/health` | Verificação básica de saúde da API |
-| GET | `/ready` | Verificação de conectividade com o banco de dados |
-| POST | `/identity/register` | Registro de uma nova conta |
+| Método | Endpoint             | Descrição                                         |
+| ------ | -------------------- | ------------------------------------------------- |
+| GET    | `/health`            | Verificação básica de saúde da API                |
+| GET    | `/ready`             | Verificação de conectividade com o banco de dados |
+| POST   | `/identity/register` | Registro de uma nova conta                        |
 
 ### Health Checks
 
@@ -406,7 +481,7 @@ Os controles de segurança são aplicados tanto nas boundaries da aplicação qu
 
 As senhas são armazenadas utilizando hashes Argon2id. Senhas em texto puro nunca são persistidas.
 
-A dependência Argon2 empacotada também foi validada dentro da imagem de runtime AWS Lambda Node.js 22 para arquitetura x86_64.
+A dependência Argon2 empacotada também foi validada dentro do runtime AWS Lambda Node.js 22 para arquitetura x86_64.
 
 ### Registration Rate Limiting
 
@@ -422,12 +497,12 @@ A configuração atual do Terraform inclui:
 
 Os limites configurados para o registro são:
 
-| Configuração | Valor |
-|---|---:|
-| Máximo de tentativas | 5 |
-| Janela de rate limiting | 900 segundos |
-| API Gateway route rate | 2 requisições/segundo |
-| API Gateway burst limit | 5 |
+| Configuração            |                 Valor |
+| ----------------------- | --------------------: |
+| Máximo de tentativas    |                     5 |
+| Janela de rate limiting |          900 segundos |
+| API Gateway route rate  | 2 requisições/segundo |
+| API Gateway burst limit |                     5 |
 
 O throttling do API Gateway é uma camada adicional de proteção e não substitui a implementação de rate limiting por IP na aplicação.
 
@@ -450,16 +525,19 @@ A configuração Terraform está localizada em `terraform/`.
 
 O deployment atual utiliza:
 
-| Componente | Responsabilidade |
-|---|---|
-| API Gateway HTTP API | Ponto de entrada HTTP público |
-| AWS Lambda | Runtime da aplicação |
-| AWS IAM | Execution role e permissões |
-| DynamoDB | Armazenamento do estado de rate limiting |
-| AWS Secrets Manager | Credenciais de conexão com o banco |
-| Parameters and Secrets Lambda Extension | Recuperação de secrets |
-| CloudWatch Logs | Logs da aplicação e do runtime |
-| Neon | Hospedagem do PostgreSQL |
+| Componente                              | Responsabilidade                         |
+| --------------------------------------- | ---------------------------------------- |
+| API Gateway HTTP API                    | Ponto de entrada HTTP público            |
+| AWS Lambda                              | Runtime da aplicação                     |
+| AWS IAM                                 | Execution role e permissões              |
+| DynamoDB                                | Armazenamento do estado de rate limiting |
+| AWS Secrets Manager                     | Credenciais de conexão com o banco       |
+| Parameters and Secrets Lambda Extension | Recuperação de secrets                   |
+| CloudWatch Logs                         | Logs da aplicação e do runtime           |
+| Amazon S3                               | Terraform remote state                   |
+| GitHub Actions                          | CI/CD e deployment de produção           |
+| AWS OIDC                                | Autenticação federada do GitHub Actions  |
+| Neon                                    | Hospedagem do PostgreSQL                 |
 
 O banco de dados é hospedado pela Neon, não pelo Amazon RDS.
 
@@ -525,29 +603,53 @@ terraform/
 
 A configuração root compõe os módulos. Cada módulo gerencia seus próprios recursos, variáveis, outputs e requisitos de providers.
 
+### Terraform State Management
+
+O Terraform utiliza um remote backend no Amazon S3 para manter o infrastructure state compartilhado entre as execuções locais e o GitHub Actions.
+
+A configuração atual utiliza:
+
+| Configuração  | Valor                                          |
+| ------------- | ---------------------------------------------- |
+| Backend       | Amazon S3                                      |
+| Bucket        | `orbis-terraform-state-450753703757-us-east-1` |
+| State key     | `orbis/production/terraform.tfstate`           |
+| Region        | `us-east-1`                                    |
+| Encryption    | SSE-S3                                         |
+| State locking | S3 lockfile                                    |
+| Versioning    | Enabled                                        |
+
+O bucket possui versionamento, criptografia em repouso, bloqueio de acesso público e uma bucket policy que exige transporte seguro.
+
+O bucket de state é provisionado separadamente da configuração Terraform que o utiliza, evitando uma dependência circular de bootstrap.
+
+O Terraform state pode conter informações sensíveis e nunca deve ser versionado no Git.
+
+O backend remoto é compartilhado entre as execuções locais autorizadas e o GitHub Actions.
+
 ## Development Workflow
 
 Execute `make` para visualizar os comandos disponíveis.
 
-| Comando | Descrição |
-|---|---|
-| `make` | Exibe os comandos disponíveis |
-| `make install` | Instala as dependências do projeto |
-| `make dev` | Inicia o servidor de desenvolvimento local |
-| `make test` | Executa a suíte de testes |
-| `make build` | Compila o TypeScript |
-| `make package` | Prepara o diretório de staging do deployment Lambda |
-| `make terraform-fmt` | Formata os arquivos Terraform |
-| `make terraform-validate` | Valida a configuração Terraform |
-| `make terraform-plan` | Empacota a aplicação e apresenta o plano de alterações Terraform |
-| `make terraform-apply` | Empacota a aplicação e aplica as alterações Terraform |
-| `make deploy` | Executa os testes, formata e valida o Terraform e aplica as alterações |
-| `make logs` | Acompanha os logs da Lambda no CloudWatch |
-| `make status` | Inspeciona a configuração da Lambda implantada |
-| `make health` | Executa o health check da API |
-| `make ready` | Verifica a API e a disponibilidade do banco |
-| `make check` | Executa os dois health checks |
-| `make clean` | Remove os artefatos de build gerados |
+| Comando                   | Descrição                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------ |
+| `make`                    | Exibe os comandos disponíveis                                                  |
+| `make install`            | Instala as dependências do projeto                                             |
+| `make dev`                | Inicia o servidor de desenvolvimento local                                     |
+| `make test`               | Executa a suíte de testes                                                      |
+| `make build`              | Compila o TypeScript                                                           |
+| `make package`            | Prepara o diretório de staging do deployment Lambda                            |
+| `make terraform-fmt`      | Formata os arquivos Terraform                                                  |
+| `make terraform-validate` | Valida a configuração Terraform                                                |
+| `make terraform-plan`     | Empacota a aplicação e apresenta o plano de alterações Terraform               |
+| `make terraform-apply`    | Empacota a aplicação e aplica as alterações Terraform localmente               |
+| `make deploy`             | Executa testes, formata e valida o Terraform e aplica as alterações localmente |
+| `make logs`               | Acompanha os logs da Lambda no CloudWatch                                      |
+| `make status`             | Inspeciona a configuração da Lambda implantada                                 |
+| `make health`             | Executa o health check da API                                                  |
+| `make ready`              | Verifica a API e a disponibilidade do banco                                    |
+| `make check`              | Executa os dois health checks                                                  |
+| `make clean`              | Remove os artefatos de build gerados                                           |
 
 ### Typical Development Workflow
 
@@ -564,23 +666,81 @@ make test
 make build
 ```
 
-### Deployment Workflow
+### Local Infrastructure Workflow
 
-Primeiro, revise as alterações de infraestrutura:
+Para operações locais autorizadas de infraestrutura, o Terraform pode ser executado através do Makefile.
+
+Visualize as alterações planejadas:
 
 ```bash
 make terraform-plan
 ```
 
-Se o plano estiver correto, execute o deployment:
+Aplique alterações localmente:
 
 ```bash
-make deploy
+make terraform-apply
 ```
 
-O comando `make deploy` executa as verificações configuradas e aplica as alterações Terraform. Por padrão, o Terraform solicita confirmação antes de modificar a infraestrutura.
+As operações Terraform locais exigem credenciais AWS com permissões apropriadas e acesso ao remote state backend.
 
-Revise cuidadosamente o plano antes de aprovar qualquer alteração.
+Esses comandos são destinados à manutenção controlada da infraestrutura e troubleshooting. Eles não representam o procedimento padrão de deployment de produção.
+
+### Production Deployment Workflow
+
+O deployment de produção deve ser executado através do GitHub Actions `Production Deployment`.
+
+O workflow utiliza `workflow_dispatch`, portanto não é iniciado automaticamente por push ou pull request.
+
+Para iniciar um deployment:
+
+1. Acesse a aba Actions do repositório.
+2. Selecione `Production Deployment`.
+3. Clique em `Run workflow`.
+4. Selecione a branch `main`.
+5. Informe a versão publicada dos Terms of Service.
+6. Inicie o workflow.
+
+O pipeline executa as seguintes etapas:
+
+| Etapa                        | Descrição                                                    |
+| ---------------------------- | ------------------------------------------------------------ |
+| Pre-deployment checks        | Instala dependências, executa testes e gera o Lambda package |
+| Terraform initialization     | Inicializa o Terraform com o remote S3 backend               |
+| Terraform plan               | Gera e salva o plano de infraestrutura                       |
+| Production approval          | Aguarda aprovação através do GitHub Environment `production` |
+| Terraform apply              | Aplica o saved plan previamente gerado                       |
+| Post-deployment verification | Verifica os endpoints `/health` e `/ready`                   |
+
+O Terraform Apply utiliza o mesmo saved plan gerado durante a etapa de planejamento. Um novo plano não é gerado automaticamente após a aprovação.
+
+### Deployment Authentication
+
+A autenticação AWS utiliza GitHub Actions OpenID Connect (OIDC).
+
+O pipeline não utiliza access keys AWS armazenadas como GitHub Secrets.
+
+Existem duas IAM roles distintas:
+
+- **Terraform Plan Role:** possui permissões de leitura necessárias para consultar a infraestrutura e gerar o Terraform plan.
+- **Terraform Deployment Role:** possui as permissões necessárias para aplicar as alterações de infraestrutura.
+
+As trust policies dessas roles restringem o acesso ao repositório e aos contextos autorizados do GitHub Actions.
+
+### Production Approval
+
+O GitHub Environment `production` exige aprovação de um reviewer autorizado antes da execução do Terraform Apply.
+
+O plano deve ser revisado antes de autorizar a aplicação das alterações.
+
+### Post-deployment Verification
+
+Após a aplicação do plano, o workflow verifica:
+
+- Disponibilidade da API através de `/health`.
+- Conectividade com PostgreSQL através de `/ready`.
+
+Um deployment somente é considerado concluído quando essas verificações passam.
 
 ## Testing
 
@@ -648,15 +808,22 @@ Não imprima nem compartilhe a connection string do banco durante o troubleshoot
 - Nunca versione `.env`, credenciais AWS, database URLs ou valores de secrets.
 - Mantenha `.env` fora do deployment package da Lambda.
 - Não registre credenciais do banco ou payloads de secrets nos logs.
-- Mantenha as permissões IAM restritas aos recursos necessários para a Lambda.
-- Revise os planos Terraform antes de aplicar alterações na infraestrutura.
+- Mantenha as permissões IAM restritas aos recursos necessários para cada role.
+- Utilize GitHub Environment protection rules para controlar deployments de produção.
+- Mantenha os workflows de produção com execução manual.
+- Utilize AWS OIDC em vez de credenciais AWS de longa duração.
+- Mantenha as permissões de Terraform Plan e Terraform Apply separadas.
+- Revise o saved Terraform plan antes de aprovar alterações de produção.
+- Aplique somente o plano Terraform que foi revisado e aprovado.
+- Preserve o versionamento do S3 state para possibilitar recuperação de versões anteriores.
+- Restrinja o acesso ao production environment e ao bucket de Terraform state.
 - Monitore a concorrência da Lambda e os limites de conexões do PostgreSQL.
 - Cada ambiente de execução Lambda aquecido mantém seu próprio connection pool PostgreSQL.
 - Utilize um endpoint Neon com connection pooling quando apropriado para workloads serverless.
 - Mantenha as migrations revisadas e versionadas.
 - Utilize bancos descartáveis para testes de integração.
-
-O Terraform state deve ser protegido e armazenado adequadamente para o ambiente de deployment. Não versione arquivos locais de state, plan files ou artefatos gerados para o deployment da Lambda.
+- Nunca utilize bancos de produção para testes automatizados.
+- Mantenha Terraform state, plan files e deployment artifacts fora do version control.
 
 ## Current Implementation Scope
 
@@ -674,9 +841,19 @@ As funcionalidades implementadas incluem:
 - Testes de integração com Testcontainers.
 - HTTP delivery com Express.
 - Deployment em AWS Lambda.
+- Integração com API Gateway HTTP API.
+- Infraestrutura DynamoDB para registration rate limiting.
+- Integração com AWS Secrets Manager.
 - Infraestrutura AWS gerenciada pelo Terraform.
+- Remote Terraform state no Amazon S3 com versionamento e state locking.
+- Workflows CI/CD através do GitHub Actions.
+- Autenticação AWS OIDC para deployments de infraestrutura.
+- Production deployments com aprovação explícita.
+- Post-deployment health checks e database readiness verification.
 
 O transactional outbox atualmente garante a persistência durável dos eventos. Um event publisher e o mecanismo de dispatch em background permanecem como trabalho futuro.
+
+O pipeline de produção utiliza workflows GitHub Actions iniciados manualmente, com aprovação explícita antes da aplicação de alterações na infraestrutura.
 
 ## Licence
 
