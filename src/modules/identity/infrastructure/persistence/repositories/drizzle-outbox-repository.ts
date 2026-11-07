@@ -1,8 +1,8 @@
-import type { DatabaseExecutor } from "../../../../../infrastructure/database/client.js";
-import { outboxEvents } from "../../../../../infrastructure/database/schema/identity.schema.js";
+import type { DatabaseExecutor } from "#infrastructure/database/client.js";
+import { outboxEvents } from "#infrastructure/database/schema/identity.schema.js";
 
-import type { UserRegistered } from "../../../domain/user-registered.event.js";
-import type { EmailVerificationRequested } from "../../../domain/email-verification-requested.event.js";
+import type { UserRegistered } from "#modules/identity/domain/user-registered.event.js";
+import type { EmailVerificationRequested } from "#modules/identity/domain/email-verification-requested.event.js";
 
 type IdentityOutboxEvent = UserRegistered | EmailVerificationRequested;
 

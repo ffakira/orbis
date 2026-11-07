@@ -1,6 +1,6 @@
-import { DatabaseExecutor } from "../../../../../infrastructure/database/client.js";
-import { termsAcceptances } from "../../../../../infrastructure/database/schema/identity.schema.js";
-import { TermsAcceptance } from "../../../domain/terms-acceptance.js";
+import { DatabaseExecutor } from "#infrastructure/database/client.js";
+import { termsAcceptances } from "#infrastructure/database/schema/identity.schema.js";
+import { TermsAcceptance } from "#modules/identity/domain/terms-acceptance.js";
 
 export class DrizzleTermsAcceptanceRepository {
   constructor(private readonly db: DatabaseExecutor) {}

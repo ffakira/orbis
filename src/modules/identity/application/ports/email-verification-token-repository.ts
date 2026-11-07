@@ -1,4 +1,4 @@
-import type { EmailVerificationToken } from "../../domain/email-verification-token.js";
+import type { EmailVerificationToken } from "#modules/identity/domain/email-verification-token.js";
 
 export interface EmailVerificationTokenRepository {
   insert(token: EmailVerificationToken): Promise<void>;

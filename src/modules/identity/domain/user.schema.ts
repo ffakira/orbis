@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Email } from "./value-objects/email.js";
+import { Email } from "#modules/identity/domain/value-objects/email.js";
 
 export const registerUserSchema = z.object({
   id: z.string().trim().min(1),

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { emailSchema } from "../../domain/value-objects/email.schema.js";
+import { emailSchema } from "#modules/identity/domain/value-objects/email.schema.js";
 
 const phoneSchema = z.string().regex(/^\+[1-9]\d{7,14}$/, {
   message: "Phone number must use international E.164 format.",

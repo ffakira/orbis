@@ -5,9 +5,9 @@ import {
   isNull,
 } from "drizzle-orm";
 
-import type { DatabaseExecutor } from "../../../../../infrastructure/database/client.js";
-import { emailVerificationTokens } from "../../../../../infrastructure/database/schema/identity.schema.js";
-import type { EmailVerificationToken } from "../../../domain/email-verification-token.js";
+import type { DatabaseExecutor } from "#infrastructure/database/client.js";
+import { emailVerificationTokens } from "#infrastructure/database/schema/identity.schema.js";
+import type { EmailVerificationToken } from "#modules/identity/domain/email-verification-token.js";
 
 export class DrizzleEmailVerificationTokenRepository {
   constructor(private readonly db: DatabaseExecutor) {}

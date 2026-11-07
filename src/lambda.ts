@@ -7,13 +7,13 @@ import type {
   Context,
 } from "aws-lambda";
 
-import { app } from "./bootstrap/http.js";
-import { env } from "./config/env.js";
+import { app } from "#bootstrap/http.js";
+import { env } from "#config/env.js";
 
 import {
   DynamoDbRegistrationRateLimiter,
   type RegistrationRateLimiter,
-} from "./infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
+} from "#infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
 
 type LambdaProxyHandler = (
   event: APIGatewayProxyEventV2,

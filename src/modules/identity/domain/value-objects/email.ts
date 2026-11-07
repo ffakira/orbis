@@ -1,4 +1,4 @@
-import { emailSchema } from "./email.schema.js";
+import { emailSchema } from "#modules/identity/domain/value-objects/email.schema.js";
 
 export class Email {
   private constructor(public readonly value: string) {}

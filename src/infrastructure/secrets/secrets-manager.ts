@@ -1,4 +1,4 @@
-import "../../config/env.js";
+import "#config/env.js";
 
 import { Buffer } from "node:buffer";
 

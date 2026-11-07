@@ -3,7 +3,7 @@ import { createHash, createHmac } from "node:crypto";
 import type {
   EmailVerificationTokenContext,
   EmailVerificationTokenSigner,
-} from "../../application/ports/email-verification-token-signer.js";
+} from "#modules/identity/application/ports/email-verification-token-signer.js";
 
 const TOKEN_CONTEXT = "orbis.email-verification.v1";
 

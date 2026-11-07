@@ -4,14 +4,14 @@ import { TermsAcceptance } from "#modules/identity/domain/terms-acceptance.js";
 import { EmailVerificationToken } from "#modules/identity/domain/email-verification-token.js";
 import { EmailVerificationRequested } from "#modules/identity/domain/email-verification-requested.event.js";
 
-import type { RegisterUserCommand } from "./register-user.schema.js";
+import type { RegisterUserCommand } from "#modules/identity/application/commands/register-user.schema.js";
 
-import type { Clock } from "../ports/clock.js";
-import type { IdGenerator } from "../ports/id-generator.js";
-import type { PasswordHasher } from "../ports/password-hasher.js";
-import type { TermsPolicy } from "../ports/terms-policy.js";
-import type { EmailVerificationTokenSigner } from "../ports/email-verification-token-signer.js";
-import type { IdentityUnitOfWork } from "../ports/unit-of-work.js";
+import type { Clock } from "#modules/identity/application/ports/clock.js";
+import type { IdGenerator } from "#modules/identity/application//ports/id-generator.js";
+import type { PasswordHasher } from "#modules/identity/application//ports/password-hasher.js";
+import type { TermsPolicy } from "#modules/identity/application//ports/terms-policy.js";
+import type { EmailVerificationTokenSigner } from "#modules/identity/application//ports/email-verification-token-signer.js";
+import type { IdentityUnitOfWork } from "#modules/identity/application//ports/unit-of-work.js";
 
 const EMAIL_VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 

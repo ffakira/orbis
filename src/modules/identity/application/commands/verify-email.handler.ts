@@ -1,10 +1,10 @@
-import type { Clock } from "../ports/clock.js";
-import type { EmailVerificationTokenSigner } from "../ports/email-verification-token-signer.js";
-import type { IdentityUnitOfWork } from "../ports/unit-of-work.js";
+import type { Clock } from "#modules/identity/application/ports/clock.js";
+import type { EmailVerificationTokenSigner } from "#modules/identity/application/ports/email-verification-token-signer.js";
+import type { IdentityUnitOfWork } from "#modules/identity/application/ports/unit-of-work.js";
 
-import type { VerifyEmailCommand } from "./verify-email.schema.js";
+import type { VerifyEmailCommand } from "#modules/identity/application/commands/verify-email.schema.js";
 
-import { InvalidEmailVerificationTokenError } from "../invalid-email-verification-token.error.js";
+import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
 
 export interface VerifyEmailDependencies {
   clock: Clock;
