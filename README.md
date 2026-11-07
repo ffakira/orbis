@@ -1,45 +1,45 @@
-# Restaurant CMV API
+# Orbis API
 
-Backend API for the Restaurant CMV platform, built with Node.js, TypeScript, and Express.
+Backend API da plataforma **Orbis**, desenvolvida com Node.js, TypeScript e Express.
 
-The application follows a modular, hexagonal architecture, with PostgreSQL persistence through Drizzle ORM. It runs locally or as an AWS Lambda function behind Amazon API Gateway.
+A aplicação utiliza uma arquitetura modular baseada em **Hexagonal Architecture (Ports and Adapters)**, com persistência em PostgreSQL através do Drizzle ORM. Pode ser executada localmente ou como uma AWS Lambda Function integrada ao Amazon API Gateway.
 
-PostgreSQL is hosted by [Neon](https://neon.tech/), while Terraform manages the AWS infrastructure.
+O PostgreSQL é hospedado pela [Neon](https://neon.tech/), enquanto a infraestrutura AWS é gerenciada com Terraform.
 
 ## Technology Stack
 
-| Category | Technology |
+| Categoria | Tecnologia |
 |---|---|
 | Runtime | Node.js 22 |
-| Language | TypeScript |
-| HTTP framework | Express 5 |
-| Validation | Zod 4 |
-| Database | PostgreSQL 18 |
+| Linguagem | TypeScript |
+| HTTP Framework | Express 5 |
+| Validação | Zod 4 |
+| Banco de dados | PostgreSQL 18 |
 | ORM | Drizzle ORM |
-| Database driver | node-postgres (`pg`) |
-| Password hashing | Argon2id |
-| HTTP testing | Supertest |
-| Test framework | Vitest |
-| Integration testing | Testcontainers |
-| Cloud runtime | AWS Lambda |
-| API gateway | Amazon API Gateway HTTP API |
-| Rate-limit storage | Amazon DynamoDB |
-| Secrets management | AWS Secrets Manager |
-| Secrets retrieval | AWS Parameters and Secrets Lambda Extension |
+| Database Driver | node-postgres (`pg`) |
+| Password Hashing | Argon2id |
+| HTTP Testing | Supertest |
+| Test Framework | Vitest |
+| Integration Testing | Testcontainers |
+| Cloud Runtime | AWS Lambda |
+| API Gateway | Amazon API Gateway HTTP API |
+| Rate-limit Storage | Amazon DynamoDB |
+| Secrets Management | AWS Secrets Manager |
+| Secrets Retrieval | AWS Parameters and Secrets Lambda Extension |
 | Infrastructure as Code | Terraform |
 
-## Architecture
+## Arquitetura
 
-The application follows **Hexagonal Architecture (Ports and Adapters)**, with business logic isolated from delivery mechanisms, frameworks, and infrastructure implementations.
+A aplicação segue os princípios de **Hexagonal Architecture (Ports and Adapters)**, mantendo as regras de negócio isoladas dos mecanismos de entrega, frameworks e implementações de infraestrutura.
 
-The architecture has four primary boundaries:
+A arquitetura possui quatro boundaries principais:
 
-- **Domain:** Business entities, value objects, and domain events.
-- **Application:** Use cases, commands, validation, and application ports.
-- **Infrastructure:** Database adapters, repositories, external services, and persistence implementations.
-- **Delivery:** HTTP and Lambda entry points.
+- **Domain:** entidades de negócio, value objects e domain events.
+- **Application:** use cases, commands, validações e application ports.
+- **Infrastructure:** database adapters, repositories, serviços externos e implementações de persistência.
+- **Delivery:** pontos de entrada HTTP e Lambda.
 
-Application use cases depend on interfaces defined by the application layer. Infrastructure provides implementations of those interfaces.
+Os use cases dependem de interfaces definidas na camada Application. A camada Infrastructure fornece as implementações dessas interfaces.
 
 ### System Architecture
 
@@ -88,13 +88,13 @@ flowchart TB
     Lambda --> CloudWatch
 ```
 
-The same Express application is used for local development and Lambda execution. `serverless-http` adapts the Express application to the AWS Lambda event model.
+A mesma aplicação Express é utilizada tanto no desenvolvimento local quanto na execução em Lambda. O `serverless-http` adapta a aplicação Express ao modelo de eventos do AWS Lambda.
 
-The DynamoDB table is provisioned for registration rate-limit state. API Gateway also provides route-level throttling. Application-level per-IP enforcement depends on the Lambda rate-limiting adapter being wired into the request path.
+A tabela DynamoDB é provisionada para armazenar o estado do rate limiting do fluxo de registro. O API Gateway também oferece throttling por rota. A aplicação de limites por IP depende da integração do rate-limiting adapter ao fluxo de requisições da Lambda.
 
 ### Registration Flow
 
-Registration is implemented as an application use case. User creation, terms acceptance, and the corresponding outbox event are persisted in a single database transaction.
+O processo de registro é implementado como um application use case. A criação do usuário, o aceite dos termos e o respectivo evento do outbox são persistidos em uma única transação de banco de dados.
 
 ```mermaid
 sequenceDiagram
@@ -127,11 +127,11 @@ sequenceDiagram
     API-->>Client: 201 Created
 ```
 
-If any persistence operation fails, the transaction is rolled back. A user cannot be created without the associated terms acceptance and outbox event.
+Caso qualquer operação de persistência falhe, a transação é revertida (*rollback*). Dessa forma, um usuário não pode ser criado sem o respectivo registro de aceite dos termos e o evento no outbox.
 
 ### Deployment Architecture
 
-Terraform separates infrastructure responsibilities into four modules.
+A infraestrutura Terraform é organizada em quatro módulos, cada um responsável por uma parte específica da infraestrutura.
 
 ```mermaid
 flowchart TB
@@ -155,12 +155,12 @@ flowchart TB
     Rate --> Table[("DynamoDB Table")]
 ```
 
-Each module owns a distinct infrastructure responsibility. The root configuration composes these modules and supplies their dependencies.
+A configuração root compõe os módulos e fornece suas dependências. Cada módulo mantém a responsabilidade pelos próprios recursos, variáveis, outputs e configurações.
 
 ## Project Structure
 
 ```text
-restaurant-cmv/
+orbis/
 ├── src/
 │   ├── config/
 │   │   └── env.ts
@@ -216,22 +216,22 @@ restaurant-cmv/
 └── README.md
 ```
 
-The project is organised around business capabilities rather than framework-specific controllers or generic service layers.
+A organização do projeto é orientada por capacidades de negócio (*business capabilities*), em vez de controllers específicos de frameworks ou camadas genéricas de services.
 
-## Prerequisites
+## Pré-requisitos
 
-Install the following tools:
+Instale as seguintes ferramentas:
 
-- Node.js 22 or later
+- Node.js 22 ou superior
 - npm
 - GNU Make
-- Docker (required for PostgreSQL integration tests)
+- Docker (necessário para os testes de integração com PostgreSQL)
 - Terraform
 - AWS CLI
-- An AWS account configured with credentials for the target account and region
-- A Neon PostgreSQL database
+- Conta AWS com credenciais configuradas para a região e conta de destino
+- Banco de dados PostgreSQL na Neon
 
-Verify the installation:
+Verifique as instalações:
 
 ```bash
 node --version
@@ -244,17 +244,17 @@ aws --version
 
 ## Getting Started
 
-Clone the repository and install dependencies:
+Clone o repositório e instale as dependências:
 
 ```bash
 git clone <repository-url>
-cd restaurant-cmv
+cd orbis
 make install
 ```
 
-### Environment Configuration
+### Configuração do ambiente
 
-Create a local `.env` file in the project root. Do not commit this file.
+Crie um arquivo `.env` na raiz do projeto. Esse arquivo não deve ser versionado.
 
 ```dotenv
 NODE_ENV=development
@@ -263,19 +263,19 @@ LOG_LEVEL=debug
 DATABASE_URL=postgresql://<user>:<password>@<host>/<database>?sslmode=require
 ```
 
-Replace the placeholders with the connection details from your Neon project.
+Substitua os placeholders pelos dados de conexão do seu projeto Neon.
 
-Use a pooled Neon connection string where appropriate for serverless workloads.
+Para workloads serverless, utilize uma connection string com connection pooling quando apropriado.
 
-### Run Locally
+### Execução local
 
-Start the development server:
+Inicie o servidor de desenvolvimento:
 
 ```bash
 make dev
 ```
 
-The API listens on:
+A API ficará disponível em:
 
 ```text
 http://localhost:3000
@@ -283,42 +283,42 @@ http://localhost:3000
 
 ## Identity and Registration
 
-The Identity module owns account registration and identity-related domain behaviour.
+O módulo Identity é responsável pelo registro de contas e pelas regras de negócio relacionadas à identidade dos usuários.
 
-Registration currently includes:
+O fluxo de registro atualmente contempla:
 
-- First and last name
-- Email address
-- International-format phone number
-- Password
-- Explicit acceptance of the Terms of Service
+- Primeiro e último nome
+- Endereço de e-mail
+- Número de telefone em formato internacional
+- Senha
+- Aceite explícito dos Terms of Service
 
 ### Registration Invariants
 
-The application enforces the following rules:
+A aplicação garante as seguintes regras:
 
-- Email addresses are normalised before persistence.
-- Passwords are hashed using Argon2id.
-- The client cannot provide the terms acceptance timestamp.
-- The client cannot select the Terms of Service version.
-- Terms acceptance is persisted as a separate record.
-- User creation, terms acceptance, and the corresponding domain event are persisted within one database transaction.
-- Duplicate email addresses are rejected.
-- Domain and application logic remain independent of Express and Drizzle.
+- Endereços de e-mail são normalizados antes da persistência.
+- Senhas são armazenadas utilizando hashes Argon2id.
+- O cliente não pode fornecer o timestamp de aceite dos termos.
+- O cliente não pode selecionar a versão dos Terms of Service.
+- O aceite dos termos é persistido em um registro separado.
+- A criação do usuário, o aceite dos termos e o respectivo domain event são persistidos dentro de uma única transação.
+- Endereços de e-mail duplicados são rejeitados.
+- As regras de Domain e Application não dependem de Express ou Drizzle.
 
 ### Transactional Outbox
 
-Domain events are persisted in the same database transaction as their associated business operation.
+Os domain events são persistidos na mesma transação de banco de dados da operação de negócio correspondente.
 
-The outbox provides durable event persistence. Event dispatch and external event publishing are not yet implemented.
+O outbox garante a persistência durável dos eventos. O mecanismo de dispatch e a publicação de eventos externos ainda não foram implementados.
 
 ## API Endpoints
 
-| Method | Endpoint | Description |
+| Método | Endpoint | Descrição |
 |---|---|---|
-| GET | `/health` | Basic API health check |
-| GET | `/ready` | Database connectivity check |
-| POST | `/identity/register` | Register a new account |
+| GET | `/health` | Verificação básica de saúde da API |
+| GET | `/ready` | Verificação de conectividade com o banco de dados |
+| POST | `/identity/register` | Registro de uma nova conta |
 
 ### Health Checks
 
@@ -327,19 +327,19 @@ curl -i http://localhost:3000/health
 curl -i http://localhost:3000/ready
 ```
 
-For the deployed API:
+Para a API em produção:
 
 ```bash
 make check
 ```
 
-The `/health` endpoint verifies that the application is responding. The `/ready` endpoint verifies that the application can connect to PostgreSQL.
+O endpoint `/health` verifica se a aplicação está respondendo. O endpoint `/ready` verifica se a aplicação consegue estabelecer uma conexão com o PostgreSQL.
 
-A successful health check alone does not guarantee database availability.
+Um health check bem-sucedido, isoladamente, não garante a disponibilidade do banco de dados.
 
 ### Account Registration
 
-Example request:
+Exemplo de requisição:
 
 ```bash
 curl -i -X POST http://localhost:3000/identity/register \
@@ -354,146 +354,146 @@ curl -i -X POST http://localhost:3000/identity/register \
   }'
 ```
 
-The request is validated using Zod before the registration use case executes.
+A requisição é validada com Zod antes da execução do registration use case.
 
 ## Database
 
-PostgreSQL is hosted by Neon.
+O PostgreSQL é hospedado pela Neon.
 
-Drizzle ORM provides typed database access, schema definitions, and migration management.
+O Drizzle ORM fornece acesso tipado ao banco de dados, definições de schema e gerenciamento de migrations.
 
 ### Schema and Migrations
 
-Database schemas are maintained in:
+Os schemas do banco de dados estão localizados em:
 
 ```text
 src/infrastructure/database/schema/
 ```
 
-Generate a migration after intentionally changing the database schema:
+Gere uma migration após uma alteração intencional no schema:
 
 ```bash
 npm run db:generate
 ```
 
-Apply migrations:
+Execute as migrations:
 
 ```bash
 npm run db:migrate
 ```
 
-Open Drizzle Studio:
+Abra o Drizzle Studio:
 
 ```bash
 npm run db:studio
 ```
 
-Review generated migrations before applying them. Previously applied migrations should be treated as immutable.
+Revise as migrations geradas antes de aplicá-las. Migrations já aplicadas devem ser tratadas como imutáveis.
 
 ### Integration Testing Database
 
-Integration tests use Testcontainers to provision disposable PostgreSQL instances.
+Os testes de integração utilizam Testcontainers para provisionar instâncias descartáveis de PostgreSQL.
 
-They apply the project's migrations and exercise the actual database adapters and transaction boundaries.
+Esses testes aplicam as migrations do projeto e exercitam os database adapters e os limites transacionais reais.
 
-Integration tests must never run against the production or development Neon database.
+Os testes de integração nunca devem ser executados contra o banco Neon de produção ou desenvolvimento.
 
 ## Security
 
-Security controls are applied at both application and infrastructure boundaries.
+Os controles de segurança são aplicados tanto nas boundaries da aplicação quanto na infraestrutura.
 
 ### Password Security
 
-Passwords are hashed using Argon2id. Plain-text passwords are never persisted.
+As senhas são armazenadas utilizando hashes Argon2id. Senhas em texto puro nunca são persistidas.
 
-The packaged Argon2 dependency has also been verified inside the AWS Lambda Node.js 22 x86_64 runtime image.
+A dependência Argon2 empacotada também foi validada dentro da imagem de runtime AWS Lambda Node.js 22 para arquitetura x86_64.
 
 ### Registration Rate Limiting
 
-The infrastructure provisions a DynamoDB table for registration rate-limit state.
+A infraestrutura provisiona uma tabela DynamoDB para armazenar o estado do rate limiting do registro.
 
-The current Terraform configuration includes:
+A configuração atual do Terraform inclui:
 
-- On-demand DynamoDB capacity.
-- A partition key identifying the rate-limit subject.
-- A sort key identifying the rate-limit window.
-- TTL-based expiration.
+- Capacidade on-demand do DynamoDB.
+- Partition key para identificar o sujeito do rate limit.
+- Sort key para identificar a janela de tempo.
+- Expiração baseada em TTL.
 - Server-side encryption.
 
-The configured registration limits are:
+Os limites configurados para o registro são:
 
-| Setting | Value |
+| Configuração | Valor |
 |---|---:|
-| Maximum attempts | 5 |
-| Rate-limit window | 900 seconds |
-| API Gateway route rate | 2 requests/second |
+| Máximo de tentativas | 5 |
+| Janela de rate limiting | 900 segundos |
+| API Gateway route rate | 2 requisições/segundo |
 | API Gateway burst limit | 5 |
 
-API Gateway throttling is an additional protection and is not a substitute for per-IP application-level enforcement.
+O throttling do API Gateway é uma camada adicional de proteção e não substitui a implementação de rate limiting por IP na aplicação.
 
 ### Secrets Management
 
-In local development, the database connection string is supplied through `.env`.
+No desenvolvimento local, a connection string do banco é fornecida através do `.env`.
 
-In AWS:
+Na AWS:
 
-- Lambda receives the secret ARN through `DB_SECRET_ARN`.
-- AWS Secrets Manager stores the actual database connection string.
-- The Lambda execution role has scoped permission to retrieve the configured secret.
-- The AWS Parameters and Secrets Lambda Extension retrieves the secret during Lambda execution.
+- A Lambda recebe o ARN do secret através de `DB_SECRET_ARN`.
+- O AWS Secrets Manager armazena a connection string real do banco.
+- A execution role da Lambda possui permissão restrita para recuperar o secret configurado.
+- O AWS Parameters and Secrets Lambda Extension recupera o secret durante a execução da Lambda.
 
-Never log secret payloads or expose credentials in application responses.
+Nunca registre o conteúdo de secrets nos logs nem exponha credenciais nas respostas da aplicação.
 
 ## AWS Infrastructure
 
-Terraform configuration is located in `terraform/`.
+A configuração Terraform está localizada em `terraform/`.
 
-The current deployment uses:
+O deployment atual utiliza:
 
-| Component | Responsibility |
+| Componente | Responsabilidade |
 |---|---|
-| API Gateway HTTP API | Public HTTP entry point |
-| AWS Lambda | Application runtime |
-| AWS IAM | Execution role and permissions |
-| DynamoDB | Registration rate-limit storage |
-| AWS Secrets Manager | Database connection credentials |
-| Parameters and Secrets Lambda Extension | Secret retrieval |
-| CloudWatch Logs | Application and runtime logs |
-| Neon | PostgreSQL hosting |
+| API Gateway HTTP API | Ponto de entrada HTTP público |
+| AWS Lambda | Runtime da aplicação |
+| AWS IAM | Execution role e permissões |
+| DynamoDB | Armazenamento do estado de rate limiting |
+| AWS Secrets Manager | Credenciais de conexão com o banco |
+| Parameters and Secrets Lambda Extension | Recuperação de secrets |
+| CloudWatch Logs | Logs da aplicação e do runtime |
+| Neon | Hospedagem do PostgreSQL |
 
-The database is hosted by Neon, not Amazon RDS.
+O banco de dados é hospedado pela Neon, não pelo Amazon RDS.
 
-The Lambda function runs Node.js 22 and uses the `serverless-http` adapter to expose the Express application.
+A função Lambda utiliza Node.js 22 e o adapter `serverless-http` para disponibilizar a aplicação Express.
 
-The Lambda function is not attached to a VPC in the current setup. It connects to Neon over the internet without provisioning NAT infrastructure.
+Na configuração atual, a Lambda não está conectada a uma VPC. A conexão com a Neon é realizada pela internet, sem necessidade de provisionar infraestrutura NAT.
 
-### Configure AWS Credentials
+### Configuração das credenciais AWS
 
-Configure the AWS CLI using your preferred credential method. For example:
+Configure a AWS CLI utilizando o método de autenticação de sua preferência. Por exemplo:
 
 ```bash
 aws configure
 ```
 
-Verify the active identity:
+Verifique a identidade AWS ativa:
 
 ```bash
 aws sts get-caller-identity
 ```
 
-The Terraform provider currently targets `us-east-1`.
+O provider Terraform está configurado para utilizar a região `us-east-1`.
 
-### Configure the Database Secret
+### Configuração do Database Secret
 
-Create a secret in AWS Secrets Manager with the name configured by Terraform.
+Crie um secret no AWS Secrets Manager com o nome configurado pelo Terraform.
 
-The current default name is:
+O nome padrão atual é:
 
 ```text
 restaurant-cmv-api/database
 ```
 
-Its secret value must be JSON with this structure:
+O valor do secret deve ser um JSON com a seguinte estrutura:
 
 ```json
 {
@@ -501,11 +501,11 @@ Its secret value must be JSON with this structure:
 }
 ```
 
-Use the actual Neon connection string as the value.
+Utilize a connection string real do projeto Neon como valor.
 
-Never put credentials directly into Terraform source files, application code, README files, or version control.
+Nunca coloque credenciais diretamente nos arquivos Terraform, no código da aplicação, no README ou no version control.
 
-Terraform reads the secret metadata to configure IAM and Lambda. The secret value should remain managed in Secrets Manager rather than being declared as a Terraform-managed secret value.
+O Terraform consulta os metadados do secret para configurar IAM e Lambda. O valor do secret deve permanecer gerenciado pelo Secrets Manager, em vez de ser declarado como um valor de secret gerenciado pelo Terraform.
 
 ### Terraform Modules
 
@@ -523,41 +523,41 @@ terraform/
 └── versions.tf
 ```
 
-The root configuration composes the modules. Each module manages its own resources, variables, outputs, and provider requirements.
+A configuração root compõe os módulos. Cada módulo gerencia seus próprios recursos, variáveis, outputs e requisitos de providers.
 
 ## Development Workflow
 
-Run `make` to display available targets.
+Execute `make` para visualizar os comandos disponíveis.
 
-| Command | Description |
+| Comando | Descrição |
 |---|---|
-| `make` | Display available commands |
-| `make install` | Install project dependencies |
-| `make dev` | Start the local development server |
-| `make test` | Run the test suite |
-| `make build` | Compile TypeScript |
-| `make package` | Build the Lambda deployment staging directory |
-| `make terraform-fmt` | Format Terraform files |
-| `make terraform-validate` | Validate Terraform configuration |
-| `make terraform-plan` | Package the application and preview Terraform changes |
-| `make terraform-apply` | Package the application and apply Terraform changes |
-| `make deploy` | Run tests, format and validate Terraform, then apply changes |
-| `make logs` | Follow Lambda CloudWatch logs |
-| `make status` | Inspect the deployed Lambda configuration |
-| `make health` | Call the API health endpoint |
-| `make ready` | Check API and database readiness |
-| `make check` | Run both health checks |
-| `make clean` | Remove generated build artifacts |
+| `make` | Exibe os comandos disponíveis |
+| `make install` | Instala as dependências do projeto |
+| `make dev` | Inicia o servidor de desenvolvimento local |
+| `make test` | Executa a suíte de testes |
+| `make build` | Compila o TypeScript |
+| `make package` | Prepara o diretório de staging do deployment Lambda |
+| `make terraform-fmt` | Formata os arquivos Terraform |
+| `make terraform-validate` | Valida a configuração Terraform |
+| `make terraform-plan` | Empacota a aplicação e apresenta o plano de alterações Terraform |
+| `make terraform-apply` | Empacota a aplicação e aplica as alterações Terraform |
+| `make deploy` | Executa os testes, formata e valida o Terraform e aplica as alterações |
+| `make logs` | Acompanha os logs da Lambda no CloudWatch |
+| `make status` | Inspeciona a configuração da Lambda implantada |
+| `make health` | Executa o health check da API |
+| `make ready` | Verifica a API e a disponibilidade do banco |
+| `make check` | Executa os dois health checks |
+| `make clean` | Remove os artefatos de build gerados |
 
 ### Typical Development Workflow
 
-Start the application:
+Inicie a aplicação:
 
 ```bash
 make dev
 ```
 
-In another terminal:
+Em outro terminal:
 
 ```bash
 make test
@@ -566,118 +566,118 @@ make build
 
 ### Deployment Workflow
 
-First review the infrastructure changes:
+Primeiro, revise as alterações de infraestrutura:
 
 ```bash
 make terraform-plan
 ```
 
-If the plan is correct, deploy:
+Se o plano estiver correto, execute o deployment:
 
 ```bash
 make deploy
 ```
 
-`make deploy` runs the configured checks and applies Terraform changes. Terraform normally asks for confirmation before making infrastructure modifications.
+O comando `make deploy` executa as verificações configuradas e aplica as alterações Terraform. Por padrão, o Terraform solicita confirmação antes de modificar a infraestrutura.
 
-Review the plan carefully before approving it.
+Revise cuidadosamente o plano antes de aprovar qualquer alteração.
 
 ## Testing
 
-The project uses Vitest for automated testing and Supertest for HTTP-level tests.
+O projeto utiliza Vitest para testes automatizados e Supertest para testes HTTP.
 
-Testcontainers provides disposable PostgreSQL instances for integration testing.
+Testcontainers fornece instâncias descartáveis de PostgreSQL para os testes de integração.
 
-The test suite covers:
+A suíte de testes contempla:
 
-- Registration validation.
-- Domain and application behaviour.
-- Duplicate email handling.
-- HTTP response behaviour.
-- Database transaction commits.
-- Database transaction rollbacks.
-- Persistence constraints.
-- Database adapter behaviour.
+- Validação do registro.
+- Comportamento de Domain e Application.
+- Tratamento de e-mails duplicados.
+- Comportamento das respostas HTTP.
+- Commit de transações no banco.
+- Rollback de transações no banco.
+- Restrições de persistência.
+- Comportamento dos database adapters.
 
-Run the complete test suite:
+Execute a suíte completa:
 
 ```bash
 make test
 ```
 
-Compile TypeScript:
+Compile o TypeScript:
 
 ```bash
 make build
 ```
 
-Before deploying, ensure tests and the production build complete successfully.
+Antes de realizar um deployment, garanta que os testes e o build de produção sejam executados com sucesso.
 
 ## Logs and Troubleshooting
 
-Follow Lambda logs:
+Acompanhe os logs da Lambda:
 
 ```bash
 make logs
 ```
 
-Inspect Lambda configuration:
+Inspecione a configuração da Lambda:
 
 ```bash
 make status
 ```
 
-Check the deployed endpoints:
+Verifique os endpoints implantados:
 
 ```bash
 make health
 make ready
 ```
 
-If `/health` succeeds but `/ready` fails, investigate:
+Se `/health` responder corretamente, mas `/ready` falhar, investigue:
 
-- The database connection.
-- The Neon connection string.
-- Lambda secret permissions.
-- Lambda logs.
+- A conexão com o banco de dados.
+- A connection string da Neon.
+- As permissões da Lambda para recuperar o secret.
+- Os logs da Lambda.
 
-Do not print or share the database connection string when troubleshooting.
+Não imprima nem compartilhe a connection string do banco durante o troubleshooting.
 
 ## Security and Operational Considerations
 
-- Never commit `.env`, AWS credentials, database URLs, or secret values.
-- Keep `.env` out of the Lambda deployment package.
-- Do not log database credentials or secret payloads.
-- Keep IAM permissions scoped to the resources required by Lambda.
-- Review Terraform plans before applying infrastructure changes.
-- Monitor Lambda concurrency and PostgreSQL connection limits.
-- Each warm Lambda execution environment maintains its own PostgreSQL connection pool.
-- Use a pooled Neon connection endpoint where appropriate for serverless workloads.
-- Keep database migrations reviewed and version-controlled.
-- Use disposable databases for integration tests.
+- Nunca versione `.env`, credenciais AWS, database URLs ou valores de secrets.
+- Mantenha `.env` fora do deployment package da Lambda.
+- Não registre credenciais do banco ou payloads de secrets nos logs.
+- Mantenha as permissões IAM restritas aos recursos necessários para a Lambda.
+- Revise os planos Terraform antes de aplicar alterações na infraestrutura.
+- Monitore a concorrência da Lambda e os limites de conexões do PostgreSQL.
+- Cada ambiente de execução Lambda aquecido mantém seu próprio connection pool PostgreSQL.
+- Utilize um endpoint Neon com connection pooling quando apropriado para workloads serverless.
+- Mantenha as migrations revisadas e versionadas.
+- Utilize bancos descartáveis para testes de integração.
 
-Terraform state must be protected and stored appropriately for the deployment environment. Do not commit local Terraform state files, plan files, or generated Lambda deployment artifacts.
+O Terraform state deve ser protegido e armazenado adequadamente para o ambiente de deployment. Não versione arquivos locais de state, plan files ou artefatos gerados para o deployment da Lambda.
 
 ## Current Implementation Scope
 
-The current implementation establishes the application foundation and Identity registration flow.
+A implementação atual estabelece a fundação da aplicação e o fluxo de registro do módulo Identity.
 
-Implemented capabilities include:
+As funcionalidades implementadas incluem:
 
-- Modular application structure.
-- Identity registration.
-- Email normalisation and uniqueness enforcement.
-- Argon2id password hashing.
-- Server-controlled terms acceptance.
-- Transactional persistence of users, terms acceptance, and outbox events.
-- PostgreSQL persistence through Drizzle.
-- Database integration testing with Testcontainers.
-- Express HTTP delivery.
-- AWS Lambda deployment.
-- Terraform-managed AWS infrastructure.
+- Estrutura modular da aplicação.
+- Registro de usuários através do Identity.
+- Normalização e garantia de unicidade de e-mail.
+- Password hashing com Argon2id.
+- Aceite dos termos controlado pelo servidor.
+- Persistência transacional de usuários, aceite dos termos e eventos do outbox.
+- Persistência PostgreSQL através do Drizzle ORM.
+- Testes de integração com Testcontainers.
+- HTTP delivery com Express.
+- Deployment em AWS Lambda.
+- Infraestrutura AWS gerenciada pelo Terraform.
 
-The transactional outbox currently provides durable event persistence. An event publisher and background dispatch mechanism remain future work.
+O transactional outbox atualmente garante a persistência durável dos eventos. Um event publisher e o mecanismo de dispatch em background permanecem como trabalho futuro.
 
 ## Licence
 
-Add the project's chosen licence here before publishing or distributing the repository.
+Adicione a licença escolhida para o projeto antes de publicar ou distribuir o repositório.
