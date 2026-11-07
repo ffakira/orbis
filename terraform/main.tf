@@ -17,6 +17,10 @@ data "aws_secretsmanager_secret" "email_verification" {
   name = var.email_verification_secret_name
 }
 
+data "aws_secretsmanager_secret" "resend" {
+  name = var.resend_secret_name
+}
+
 module "rate_limiting" {
   source = "./modules/rate-limiting"
 
@@ -31,6 +35,7 @@ module "security" {
   authentication_secret_arn     = data.aws_secretsmanager_secret.authentication.arn
   rate_limit_table_arn          = module.rate_limiting.table_arn
   email_verification_secret_arn = data.aws_secretsmanager_secret.email_verification.arn
+  resend_secret_arn             = data.aws_secretsmanager_secret.resend.arn
 }
 
 module "lambda" {
@@ -42,6 +47,8 @@ module "lambda" {
   source_code_hash = data.archive_file.lambda.output_base64sha256
 
   execution_role_arn        = module.security.execution_role_arn
+  outbox_execution_role_arn = module.security.outbox_execution_role_arn
+
   database_secret_arn       = data.aws_secretsmanager_secret.database.arn
   authentication_secret_arn = data.aws_secretsmanager_secret.authentication.arn
 
@@ -52,6 +59,10 @@ module "lambda" {
   rate_limit_window_seconds = var.registration_rate_limit_window_seconds
 
   email_verification_secret_arn = data.aws_secretsmanager_secret.email_verification.arn
+  resend_secret_arn             = data.aws_secretsmanager_secret.resend.arn
+
+  email_from_address = var.email_from_address
+  public_app_url     = var.public_app_url
 
   depends_on = [
     module.security

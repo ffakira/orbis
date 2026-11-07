@@ -33,3 +33,43 @@ resource "aws_lambda_function" "api" {
     }
   }
 }
+
+resource "aws_lambda_function" "outbox" {
+  function_name = "${var.project_name}-outbox"
+  description   = "Processes pending outbox events"
+
+  filename         = var.package_path
+  source_code_hash = var.source_code_hash
+
+  role = var.outbox_execution_role_arn
+
+  runtime = "nodejs22.x"
+  handler = "dist/outbox-lambda.handler"
+
+  memory_size = 256
+  timeout     = 60
+
+  layers = [
+    "arn:aws:lambda:us-east-1:177933569100:layer:AWS-Parameters-and-Secrets-Lambda-Extension:171"
+  ]
+
+  environment {
+    variables = {
+      NODE_ENV      = "production"
+      LOG_LEVEL     = "info"
+      DB_SECRET_ARN = var.database_secret_arn
+
+      EMAIL_VERIFICATION_SECRET_ARN = var.email_verification_secret_arn
+      RESEND_SECRET_ARN             = var.resend_secret_arn
+
+      EMAIL_FROM_ADDRESS = var.email_from_address
+      PUBLIC_APP_URL     = var.public_app_url
+
+      OUTBOX_BATCH_SIZE          = "25"
+      OUTBOX_LEASE_DURATION_MS   = "60000"
+      OUTBOX_MAX_ATTEMPTS        = "10"
+      OUTBOX_RETRY_BASE_DELAY_MS = "1000"
+      OUTBOX_RETRY_MAX_DELAY_MS  = "900000"
+    }
+  }
+}

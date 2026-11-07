@@ -87,3 +87,29 @@ variable "email_verification_secret_name" {
   type        = string
   default     = "restaurant-cmv-api/email-verification"
 }
+
+variable "resend_secret_name" {
+  description = "Secrets Manager name containing the Resend API key"
+  type        = string
+  default     = "restaurant-cmv-api/resend"
+}
+
+variable "email_from_address" {
+  description = "Verified sender email address used by the outbox worker"
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$", var.email_from_address))
+    error_message = "The email_from_address must be a valid email address."
+  }
+}
+
+variable "public_app_url" {
+  description = "Public HTTPS application URL used when generating email links"
+  type        = string
+
+  validation {
+    condition     = startswith(trimspace(var.public_app_url), "https://")
+    error_message = "The public_app_url must use HTTPS."
+  }
+}

@@ -14,6 +14,10 @@ variable "execution_role_arn" {
   type = string
 }
 
+variable "outbox_execution_role_arn" {
+  type = string
+}
+
 variable "database_secret_arn" {
   type = string
 }
@@ -39,5 +43,17 @@ variable "rate_limit_window_seconds" {
 }
 
 variable "email_verification_secret_arn" {
+  type = string
+}
+
+variable "resend_secret_arn" {
+  type = string
+}
+
+variable "email_from_address" {
+  type = string
+}
+
+variable "public_app_url" {
   type = string
 }

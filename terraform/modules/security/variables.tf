@@ -17,3 +17,7 @@ variable "rate_limit_table_arn" {
 variable "email_verification_secret_arn" {
   type = string
 }
+
+variable "resend_secret_arn" {
+  type = string
+}
