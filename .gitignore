@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Terraform plans
+*.tfplan
+
+# Terraform archives
+terraform/lambda.zip
+
+# Terraform variables containing environment-specific values
+terraform/*.tfvars
+!terraform/*.example.tfvars
+
+# Logs
+*.log
+
+# Coverage
+coverage/
