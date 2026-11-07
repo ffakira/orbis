@@ -2,4 +2,5 @@ import type { EmailVerificationToken } from "../../domain/email-verification-tok
 
 export interface EmailVerificationTokenRepository {
   insert(token: EmailVerificationToken): Promise<void>;
+  consume(tokenHash: string, consumedAt: Date): Promise<string | null>;
 }

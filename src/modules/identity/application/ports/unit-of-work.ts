@@ -8,6 +8,7 @@ import type { EmailVerificationTokenRepository } from "./email-verification-toke
 export interface IdentityTransaction {
   users: {
     insert(user: User): Promise<void>;
+    activate(userId: string, activatedAt: Date): Promise<boolean>;
   };
 
   authenticationUsers: AuthenticationUserRepository;

@@ -2,14 +2,15 @@ import { randomUUID } from "node:crypto";
 
 import { env } from "../config/env.js";
 import { getEmailVerificationSecret } from "../infrastructure/secrets/secrets-manager.js";
+import { getDatabase } from "../infrastructure/database/client.js";
 
 import { RegisterUserHandler } from "../modules/identity/application/commands/register-user.handler.js";
+import { VerifyEmailHandler } from "../modules/identity/application/commands/verify-email.handler.js";
 
 import type { Clock } from "../modules/identity/application/ports/clock.js";
 import type { IdGenerator } from "../modules/identity/application/ports/id-generator.js";
 import type { TermsPolicy } from "../modules/identity/application/ports/terms-policy.js";
 
-import { getDatabase } from "../infrastructure/database/client.js";
 import { DrizzleIdentityUnitOfWork } from "../modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
 import { Argon2PasswordHasher } from "../modules/identity/infrastructure/cryptography/argon2-password-hasher.js";
 import { HmacEmailVerificationTokenSigner } from "../modules/identity/infrastructure/cryptography/hmac-email-verification-token-signer.js";
@@ -40,35 +41,77 @@ class ConfiguredTermsPolicy implements TermsPolicy {
   }
 }
 
-let handlerPromise: Promise<RegisterUserHandler> | undefined;
+const clock = new SystemClock();
+
+let dependenciesPromise:
+  | Promise<{
+      unitOfWork: DrizzleIdentityUnitOfWork;
+      emailVerificationTokenSigner: HmacEmailVerificationTokenSigner;
+    }>
+  | undefined;
+
+function getIdentityDependencies() {
+  dependenciesPromise ??= (async () => {
+    const [db, emailVerificationSecret] = await Promise.all([
+      getDatabase(),
+      getEmailVerificationSecret(),
+    ]);
+
+    return {
+      unitOfWork: new DrizzleIdentityUnitOfWork(db),
+      emailVerificationTokenSigner: new HmacEmailVerificationTokenSigner(
+        emailVerificationSecret.EMAIL_VERIFICATION_SECRET,
+      ),
+    };
+  })().catch((error: unknown) => {
+    dependenciesPromise = undefined;
+    throw error;
+  });
+
+  return dependenciesPromise;
+}
+
+let registerUserHandlerPromise: Promise<RegisterUserHandler> | undefined;
 
 export function getRegisterUserHandler(): Promise<RegisterUserHandler> {
-  handlerPromise ??= (async () => {
+  registerUserHandlerPromise ??= (async () => {
     const termsVersion = env.termsOfServiceVersion;
 
     if (!termsVersion) {
       throw new Error("TERMS_OF_SERVICE_VERSION is not configured.");
     }
 
-    const [db, emailVerificationSecret] = await Promise.all([
-      getDatabase(),
-      getEmailVerificationSecret(),
-    ]);
+    const dependencies = await getIdentityDependencies();
 
     return new RegisterUserHandler({
       ids: new UuidGenerator(),
-      clock: new SystemClock(),
+      clock,
       passwordHasher: new Argon2PasswordHasher(),
       termsPolicy: new ConfiguredTermsPolicy(termsVersion),
-      emailVerificationTokenSigner: new HmacEmailVerificationTokenSigner(
-        emailVerificationSecret.EMAIL_VERIFICATION_SECRET,
-      ),
-      unitOfWork: new DrizzleIdentityUnitOfWork(db),
+      ...dependencies,
     });
   })().catch((error: unknown) => {
-    handlerPromise = undefined;
+    registerUserHandlerPromise = undefined;
     throw error;
   });
 
-  return handlerPromise;
+  return registerUserHandlerPromise;
+}
+
+let verifyEmailHandlerPromise: Promise<VerifyEmailHandler> | undefined;
+
+export function getVerifyEmailHandler(): Promise<VerifyEmailHandler> {
+  verifyEmailHandlerPromise ??= (async () => {
+    const dependencies = await getIdentityDependencies();
+
+    return new VerifyEmailHandler({
+      clock,
+      ...dependencies,
+    });
+  })().catch((error: unknown) => {
+    verifyEmailHandlerPromise = undefined;
+    throw error;
+  });
+
+  return verifyEmailHandlerPromise;
 }

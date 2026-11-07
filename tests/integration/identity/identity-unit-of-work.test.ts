@@ -1,11 +1,22 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
+
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool } from "pg";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { resolve } from "node:path";
 
 import * as schema from "../../../src/infrastructure/database/schema/index.js";
+
 import {
   users,
   termsAcceptances,
@@ -19,6 +30,7 @@ import { User } from "../../../src/modules/identity/domain/user.js";
 import { Email } from "../../../src/modules/identity/domain/value-objects/email.js";
 import { TermsAcceptance } from "../../../src/modules/identity/domain/terms-acceptance.js";
 import { EmailVerificationToken } from "../../../src/modules/identity/domain/email-verification-token.js";
+
 import { EmailAlreadyRegisteredError } from "../../../src/modules/identity/application/email-already-registered.error.js";
 
 import type { Database } from "../../../src/infrastructure/database/client.js";
@@ -151,7 +163,9 @@ describe("DrizzleIdentityUnitOfWork", () => {
 
     expect(persistedUsers[0]?.email).toBe("test@example.com");
     expect(persistedAcceptances[0]?.userId).toBe(registration.user.id);
-    expect(persistedEvents[0]?.eventType).toBe("identity.user_registered.v1");
+    expect(persistedEvents[0]?.eventType).toBe(
+      "identity.user_registered.v1",
+    );
   });
 
   it("rolls back the user when terms acceptance insertion fails", async () => {
@@ -306,5 +320,112 @@ describe("DrizzleIdentityUnitOfWork", () => {
     expect(await db.select().from(emailVerificationTokens)).toHaveLength(0);
     expect(await db.select().from(termsAcceptances)).toHaveLength(0);
     expect(await db.select().from(outboxEvents)).toHaveLength(0);
+  });
+
+  it("consumes a valid token and activates the user atomically", async () => {
+    const registration = createRegistration(
+      "00000000-0000-4000-8000-000000000071",
+      "00000000-0000-4000-8000-000000000072",
+      "00000000-0000-4000-8000-000000000073",
+      "verification-success@example.com",
+    );
+
+    const token = createEmailVerificationToken(
+      "00000000-0000-4000-8000-000000000074",
+      registration.user.id,
+    );
+
+    const consumedAt = new Date("2026-11-07T12:00:00.000Z");
+
+    await unitOfWork.transaction(async (transaction) => {
+      await transaction.users.insert(registration.user);
+      await transaction.emailVerificationTokens.insert(token);
+
+      const userId = await transaction.emailVerificationTokens.consume(
+        token.tokenHash,
+        consumedAt,
+      );
+
+      expect(userId).toBe(registration.user.id);
+
+      const activated = await transaction.users.activate(
+        userId!,
+        consumedAt,
+      );
+
+      expect(activated).toBe(true);
+
+      // A second consumption attempt must fail.
+      const replayedUserId =
+        await transaction.emailVerificationTokens.consume(
+          token.tokenHash,
+          consumedAt,
+        );
+
+      expect(replayedUserId).toBeNull();
+    });
+
+    const [persistedUser] = await db.select().from(users);
+    const [persistedToken] = await db
+      .select()
+      .from(emailVerificationTokens);
+
+    expect(persistedUser?.status).toBe("active");
+    expect(persistedUser?.updatedAt).toEqual(consumedAt);
+    expect(persistedToken?.consumedAt).toEqual(consumedAt);
+  });
+
+  it("rolls back token consumption when user activation fails", async () => {
+    const registration = createRegistration(
+      "00000000-0000-4000-8000-000000000081",
+      "00000000-0000-4000-8000-000000000082",
+      "00000000-0000-4000-8000-000000000083",
+      "verification-rollback@example.com",
+    );
+
+    const token = createEmailVerificationToken(
+      "00000000-0000-4000-8000-000000000084",
+      registration.user.id,
+    );
+
+    const consumedAt = new Date("2026-11-07T12:00:00.000Z");
+
+    await unitOfWork.transaction(async (transaction) => {
+      await transaction.users.insert(registration.user);
+      await transaction.emailVerificationTokens.insert(token);
+    });
+
+    // Simulate an account that has already been activated.
+    await db
+      .update(users)
+      .set({ status: "active" })
+      .where(eq(users.id, registration.user.id));
+
+    await expect(
+      unitOfWork.transaction(async (transaction) => {
+        const userId = await transaction.emailVerificationTokens.consume(
+          token.tokenHash,
+          consumedAt,
+        );
+
+        expect(userId).toBe(registration.user.id);
+
+        const activated = await transaction.users.activate(
+          userId!,
+          consumedAt,
+        );
+
+        if (!activated) {
+          throw new Error("User cannot be activated.");
+        }
+      }),
+    ).rejects.toThrow("User cannot be activated.");
+
+    const [persistedToken] = await db
+      .select()
+      .from(emailVerificationTokens);
+
+    // The transaction rolled back, so the token remains unconsumed.
+    expect(persistedToken?.consumedAt).toBeNull();
   });
 });

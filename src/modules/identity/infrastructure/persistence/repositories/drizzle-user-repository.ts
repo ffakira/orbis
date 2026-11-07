@@ -1,3 +1,5 @@
+import { and, eq } from "drizzle-orm";
+
 import type { User } from "../../../domain/user.js";
 import { EmailAlreadyRegisteredError } from "../../../application/email-already-registered.error.js";
 
@@ -59,5 +61,25 @@ export class DrizzleUserRepository {
 
       throw error;
     }
+  }
+
+  async activate(userId: string, activatedAt: Date): Promise<boolean> {
+    const [activatedUser] = await this.db
+      .update(users)
+      .set({
+        status: "active",
+        updatedAt: activatedAt,
+      })
+      .where(
+        and(
+          eq(users.id, userId),
+          eq(users.status, "pending_email_verification"),
+        ),
+      )
+      .returning({
+        id: users.id,
+      });
+
+    return activatedUser !== undefined;
   }
 }

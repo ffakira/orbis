@@ -9,7 +9,7 @@ export type Database = NodePgDatabase<typeof schema>;
  * The common insert capability shared by the database and
  * transaction-scoped Drizzle executors.
  */
-export type DatabaseExecutor = Pick<Database, "insert">;
+export type DatabaseExecutor = Pick<Database, "insert" | "update">;
 
 let databasePromise: Promise<Database> | undefined;
 

@@ -1,7 +1,7 @@
 import { createApp } from "../delivery/http/app.js";
 
 import { getDatabasePool } from "../infrastructure/database/postgres.js";
-import { getRegisterUserHandler } from "./identity.js";
+import { getRegisterUserHandler, getVerifyEmailHandler } from "./identity.js";
 
 async function checkDatabaseReadiness() {
   const pool = await getDatabasePool();
@@ -32,5 +32,6 @@ async function checkDatabaseReadiness() {
 
 export const app = createApp({
   getRegisterUserHandler,
+  getVerifyEmailHandler,
   checkDatabaseReadiness,
 });

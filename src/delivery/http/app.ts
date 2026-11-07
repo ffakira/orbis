@@ -1,15 +1,27 @@
 import express from "express";
 
 import type { RegisterUserResult } from "../../modules/identity/application/commands/register-user.handler.js";
+import type { VerifyEmailResult } from "../../modules/identity/application/commands/verify-email.handler.js";
 
 import {
-  RegisterUserCommand,
   registerUserSchema,
+  type RegisterUserCommand,
 } from "../../modules/identity/application/commands/register-user.schema.js";
+
+import {
+  verifyEmailSchema,
+  type VerifyEmailCommand,
+} from "../../modules/identity/application/commands/verify-email.schema.js";
+
 import { EmailAlreadyRegisteredError } from "../../modules/identity/application/email-already-registered.error.js";
+import { InvalidEmailVerificationTokenError } from "../../modules/identity/application/invalid-email-verification-token.error.js";
 
 export interface RegistrationHandler {
   execute(command: RegisterUserCommand): Promise<RegisterUserResult>;
+}
+
+export interface EmailVerificationHandler {
+  execute(command: VerifyEmailCommand): Promise<VerifyEmailResult>;
 }
 
 export interface DatabaseReadiness {
@@ -20,6 +32,7 @@ export interface DatabaseReadiness {
 
 export interface AppDependencies {
   getRegisterUserHandler: () => Promise<RegistrationHandler>;
+  getVerifyEmailHandler: () => Promise<EmailVerificationHandler>;
   checkDatabaseReadiness: () => Promise<DatabaseReadiness>;
 }
 
@@ -89,6 +102,45 @@ export function createApp(dependencies: AppDependencies) {
 
       console.error(
         "User registration failed:",
+        error instanceof Error ? error.name : "UnknownError",
+      );
+
+      return res.status(500).json({
+        error: "INTERNAL_SERVER_ERROR",
+        message: "An unexpected error occurred.",
+      });
+    }
+  });
+
+  app.post("/identity/verify-email", async (req, res) => {
+    const validation = verifyEmailSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({
+        error: "VALIDATION_ERROR",
+        message: "The verification request is invalid.",
+        issues: validation.error.issues.map((issue) => ({
+          path: issue.path,
+          message: issue.message,
+        })),
+      });
+    }
+
+    try {
+      const handler = await dependencies.getVerifyEmailHandler();
+      const result = await handler.execute(validation.data);
+
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof InvalidEmailVerificationTokenError) {
+        return res.status(400).json({
+          error: "INVALID_EMAIL_VERIFICATION_TOKEN",
+          message: "The verification token is invalid or has expired.",
+        });
+      }
+
+      console.error(
+        "Email verification failed:",
         error instanceof Error ? error.name : "UnknownError",
       );
 
