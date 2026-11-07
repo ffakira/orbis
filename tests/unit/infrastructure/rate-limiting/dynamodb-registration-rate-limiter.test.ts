@@ -1,9 +1,9 @@
 import { DynamoDBClient, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DynamoDbRegistrationRateLimiter } from "../../../src/infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
+import { DynamoDbRegistrationRateLimiter } from "../../../../src/infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
 
-import type { RegistrationRateLimiter } from "../../../src/infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
+import type { RegistrationRateLimiter } from "../../../../src/infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
 
 const TABLE_NAME = "synthetic-registration-rate-limits";
 const MAX_ATTEMPTS = 5;

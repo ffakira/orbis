@@ -2,8 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
-import { User } from "../../../../src/modules/identity/domain/user.js";
-import { Email } from "../../../../src/modules/identity/domain/value-objects/email.js";
+import { User } from "../../../../../src/modules/identity/domain/user.js";
+import { Email } from "../../../../../src/modules/identity/domain/value-objects/email.js";
 
 const registeredAt = "2026-11-07T10:00:00.000Z";
 

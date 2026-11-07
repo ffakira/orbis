@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { RegisterUserHandler } from "../../../../src/modules/identity/application/commands/register-user.handler.js";
+import { RegisterUserHandler } from "../../../../../src/modules/identity/application/commands/register-user.handler.js";
 
-import type { RegisterUserCommand } from "../../../../src/modules/identity/application/commands/register-user.schema.js";
-import type { IdentityTransaction } from "../../../../src/modules/identity/application/ports/unit-of-work.js";
+import type { RegisterUserCommand } from "../../../../../src/modules/identity/application/commands/register-user.schema.js";
+import type { IdentityTransaction } from "../../../../../src/modules/identity/application/ports/unit-of-work.js";
 
 const registeredAt = "2026-11-07T10:00:00.000Z";
 
@@ -69,6 +69,7 @@ describe("RegisterUserHandler", () => {
 
       passwordHasher: {
         hash: vi.fn(async () => "$argon2id$synthetic-hash"),
+        verify: vi.fn(async () => true),
       },
 
       termsPolicy: {
@@ -121,6 +122,7 @@ describe("RegisterUserHandler", () => {
         hash: vi.fn(async () => {
           throw new Error("Hashing failed.");
         }),
+        verify: vi.fn(async () => false),
       },
 
       termsPolicy: {
