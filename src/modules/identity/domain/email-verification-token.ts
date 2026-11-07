@@ -1,28 +1,33 @@
-import {
-  emailVerificationTokenSchema,
-  type IssueEmailVerificationTokenProps,
-} from "./email-verification-token.schema.js";
+export interface EmailVerificationTokenProps {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  createdAt: Date;
+}
 
 export class EmailVerificationToken {
   private constructor(
     public readonly id: string,
     public readonly userId: string,
     public readonly tokenHash: string,
-    public readonly expiresAt: string,
-    public readonly createdAt: string,
+    public readonly expiresAt: Date,
+    public readonly createdAt: Date,
   ) {}
 
-  static issue(
-    props: IssueEmailVerificationTokenProps,
-  ): EmailVerificationToken {
-    const validated = emailVerificationTokenSchema.parse(props);
+  static create(props: EmailVerificationTokenProps): EmailVerificationToken {
+    if (props.expiresAt <= props.createdAt) {
+      throw new Error(
+        "Email verification token expiration must be after its creation time.",
+      );
+    }
 
     return new EmailVerificationToken(
-      validated.id,
-      validated.userId,
-      validated.tokenHash,
-      validated.expiresAt,
-      validated.createdAt,
+      props.id,
+      props.userId,
+      props.tokenHash,
+      props.expiresAt,
+      props.createdAt,
     );
   }
 }

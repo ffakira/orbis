@@ -5,6 +5,8 @@ import type {
 
 import type { Database } from "../../../../infrastructure/database/client.js";
 
+import { DrizzleAuthenticationUserRepository } from "./repositories/drizzle-authentication-user-repository.js";
+import { DrizzleEmailVerificationTokenRepository } from "./repositories/drizzle-email-verification-token-repository.js";
 import { DrizzleOutboxRepository } from "./repositories/drizzle-outbox-repository.js";
 import { DrizzleTermsAcceptanceRepository } from "./repositories/drizzle-terms-acceptance-repository.js";
 import { DrizzleUserRepository } from "./repositories/drizzle-user-repository.js";
@@ -18,7 +20,10 @@ export class DrizzleIdentityUnitOfWork implements IdentityUnitOfWork {
     return this.db.transaction(async (tx) => {
       const transaction: IdentityTransaction = {
         users: new DrizzleUserRepository(tx),
+        authenticationUsers: new DrizzleAuthenticationUserRepository(tx),
         termsAcceptances: new DrizzleTermsAcceptanceRepository(tx),
+        emailVerificationTokens:
+          new DrizzleEmailVerificationTokenRepository(tx),
         outbox: new DrizzleOutboxRepository(tx),
       };
 
