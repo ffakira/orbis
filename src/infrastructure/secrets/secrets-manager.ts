@@ -1,7 +1,13 @@
 import "../../config/env.js";
 
+import { Buffer } from "node:buffer";
+
 interface DatabaseSecret {
   DATABASE_URL: string;
+}
+
+interface AuthenticationSecret {
+  JWT_SECRET: Uint8Array;
 }
 
 interface SecretsManagerResponse {
@@ -9,6 +15,53 @@ interface SecretsManagerResponse {
 }
 
 let databaseSecretPromise: Promise<DatabaseSecret> | undefined;
+let authenticationSecretPromise: Promise<AuthenticationSecret> | undefined;
+
+function parseSecretString(secretString: string, secretName: string): unknown {
+  try {
+    return JSON.parse(secretString);
+  } catch {
+    throw new Error(`${secretName} secret contains invalid JSON`);
+  }
+}
+
+async function retrieveSecretString(
+  secretArn: string,
+  secretName: string,
+): Promise<string> {
+  const sessionToken = process.env.AWS_SESSION_TOKEN;
+
+  if (!sessionToken) {
+    throw new Error("AWS_SESSION_TOKEN environment variable is missing");
+  }
+
+  const port = process.env.PARAMETERS_SECRETS_EXTENSION_HTTP_PORT ?? "2773";
+
+  const url = new URL(`http://localhost:${port}/secretsmanager/get`);
+  url.searchParams.set("secretId", secretArn);
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "X-Aws-Parameters-Secrets-Token": sessionToken,
+    },
+    signal: AbortSignal.timeout(5000),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Secrets Manager extension returned HTTP ${response.status} while retrieving ${secretName}`,
+    );
+  }
+
+  const result = (await response.json()) as SecretsManagerResponse;
+
+  if (!result.SecretString) {
+    throw new Error(`${secretName} secret has no SecretString`);
+  }
+
+  return result.SecretString;
+}
 
 function validateDatabaseSecret(value: unknown): DatabaseSecret {
   if (
@@ -31,74 +84,96 @@ function validateDatabaseSecret(value: unknown): DatabaseSecret {
   return { DATABASE_URL: connectionString };
 }
 
+function validateAuthenticationSecret(value: unknown): AuthenticationSecret {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("JWT_SECRET" in value) ||
+    typeof value.JWT_SECRET !== "string" ||
+    value.JWT_SECRET.trim() === ""
+  ) {
+    throw new Error("Invalid authentication secret: JWT_SECRET is missing");
+  }
+
+  const encodedSecret = value.JWT_SECRET;
+
+  if (
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(encodedSecret) ||
+    encodedSecret.length % 4 !== 0
+  ) {
+    throw new Error("Invalid authentication secret: JWT_SECRET must be Base64");
+  }
+
+  const decodedSecret = Buffer.from(encodedSecret, "base64");
+
+  if (
+    decodedSecret.length < 32 ||
+    decodedSecret.toString("base64") !== encodedSecret
+  ) {
+    throw new Error(
+      "Invalid authentication secret: JWT_SECRET must contain at least 32 random bytes",
+    );
+  }
+
+  return { JWT_SECRET: decodedSecret };
+}
+
 async function retrieveDatabaseSecret(): Promise<DatabaseSecret> {
   const secretArn = process.env.DB_SECRET_ARN;
 
-  // Local development uses the .env connection string.
   if (!secretArn) {
     const databaseUrl = process.env.DATABASE_URL;
 
     if (!databaseUrl) {
-      throw new Error(
-        "Neither DB_SECRET_ARN nor DATABASE_URL is configured",
-      );
+      throw new Error("Neither DB_SECRET_ARN nor DATABASE_URL is configured");
     }
 
     return validateDatabaseSecret({ DATABASE_URL: databaseUrl });
   }
 
-  // Production retrieves the secret through the Lambda extension.
-  const sessionToken = process.env.AWS_SESSION_TOKEN;
+  const secretString = await retrieveSecretString(secretArn, "Database");
 
-  if (!sessionToken) {
-    throw new Error("AWS_SESSION_TOKEN environment variable is missing");
+  return validateDatabaseSecret(parseSecretString(secretString, "Database"));
+}
+
+async function retrieveAuthenticationSecret(): Promise<AuthenticationSecret> {
+  const secretArn = process.env.AUTHENTICATION_SECRET_ARN;
+
+  if (!secretArn) {
+    const jwtSecret = process.env.JWT_SECRET;
+
+    if (!jwtSecret) {
+      throw new Error(
+        "Neither AUTHENTICATION_SECRET_ARN nor JWT_SECRET is configured",
+      );
+    }
+
+    return validateAuthenticationSecret({ JWT_SECRET: jwtSecret });
   }
 
-  const port =
-    process.env.PARAMETERS_SECRETS_EXTENSION_HTTP_PORT ?? "2773";
+  const secretString = await retrieveSecretString(secretArn, "Authentication");
 
-  const url = new URL(`http://localhost:${port}/secretsmanager/get`);
-
-  url.searchParams.set("secretId", secretArn);
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "X-Aws-Parameters-Secrets-Token": sessionToken,
-    },
-    signal: AbortSignal.timeout(5000),
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Secrets Manager extension returned HTTP ${response.status}`,
-    );
-  }
-
-  const result = (await response.json()) as SecretsManagerResponse;
-
-  if (!result.SecretString) {
-    throw new Error("Database secret has no SecretString");
-  }
-
-  let parsedSecret: unknown;
-
-  try {
-    parsedSecret = JSON.parse(result.SecretString);
-  } catch {
-    throw new Error("Database secret contains invalid JSON");
-  }
-
-  return validateDatabaseSecret(parsedSecret);
+  return validateAuthenticationSecret(
+    parseSecretString(secretString, "Authentication"),
+  );
 }
 
 export function getDatabaseSecret(): Promise<DatabaseSecret> {
-  databaseSecretPromise ??= retrieveDatabaseSecret().catch(
+  databaseSecretPromise ??= retrieveDatabaseSecret().catch((error: unknown) => {
+    databaseSecretPromise = undefined;
+    throw error;
+  });
+
+  return databaseSecretPromise;
+}
+
+export function getAuthenticationSecret(): Promise<AuthenticationSecret> {
+  authenticationSecretPromise ??= retrieveAuthenticationSecret().catch(
     (error: unknown) => {
-      databaseSecretPromise = undefined;
+      authenticationSecretPromise = undefined;
       throw error;
     },
   );
 
-  return databaseSecretPromise;
+  return authenticationSecretPromise;
 }

@@ -82,12 +82,8 @@
           "name": "terms_acceptances_user_id_users_id_fk",
           "tableFrom": "terms_acceptances",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -168,9 +164,7 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -182,11 +176,7 @@
     "public.user_status": {
       "name": "user_status",
       "schema": "public",
-      "values": [
-        "pending_email_verification",
-        "active",
-        "suspended"
-      ]
+      "values": ["pending_email_verification", "active", "suspended"]
     }
   },
   "schemas": {},

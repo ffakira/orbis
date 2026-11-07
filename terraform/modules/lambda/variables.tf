@@ -18,6 +18,10 @@ variable "database_secret_arn" {
   type = string
 }
 
+variable "authentication_secret_arn" {
+  type = string
+}
+
 variable "terms_of_service_version" {
   type = string
 }

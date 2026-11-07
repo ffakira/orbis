@@ -39,7 +39,10 @@ resource "aws_iam_role_policy" "lambda_secrets_access" {
           "secretsmanager:GetSecretValue"
         ]
 
-        Resource = var.database_secret_arn
+        Resource = [
+          var.database_secret_arn,
+          var.authentication_secret_arn
+        ]
       }
     ]
   })

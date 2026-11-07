@@ -19,10 +19,11 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      NODE_ENV                 = "production"
-      LOG_LEVEL                = "info"
-      DB_SECRET_ARN            = var.database_secret_arn
-      TERMS_OF_SERVICE_VERSION = var.terms_of_service_version
+      NODE_ENV                  = "production"
+      LOG_LEVEL                 = "info"
+      DB_SECRET_ARN             = var.database_secret_arn
+      AUTHENTICATION_SECRET_ARN = var.authentication_secret_arn
+      TERMS_OF_SERVICE_VERSION  = var.terms_of_service_version
 
       REGISTRATION_RATE_LIMIT_TABLE_NAME     = var.rate_limit_table_name
       REGISTRATION_RATE_LIMIT_MAX_ATTEMPTS   = tostring(var.rate_limit_max_attempts)

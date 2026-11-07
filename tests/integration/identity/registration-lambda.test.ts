@@ -1,15 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  APIGatewayProxyEventV2,
-  Context,
-} from "aws-lambda";
+import type { APIGatewayProxyEventV2, Context } from "aws-lambda";
 
 import { createLambdaHandler } from "../../../src/lambda.js";
 
-import type {
-  RegistrationRateLimiter,
-} from "../../../src/infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
+import type { RegistrationRateLimiter } from "../../../src/infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
 
 function createEvent(
   routeKey = "POST /identity/register",
@@ -110,16 +105,14 @@ describe("Lambda registration rate limiting", () => {
 
   it("fails closed when DynamoDB is unavailable", async () => {
     const rateLimiter: RegistrationRateLimiter = {
-      consume: vi.fn().mockRejectedValue(
-        new Error("Synthetic DynamoDB failure"),
-      ),
+      consume: vi
+        .fn()
+        .mockRejectedValue(new Error("Synthetic DynamoDB failure")),
     };
 
     const proxyHandler = vi.fn();
 
-    const errorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     try {
       const handler = createLambdaHandler({

@@ -1,13 +1,9 @@
 import { DynamoDBClient, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  DynamoDbRegistrationRateLimiter,
-} from "../../../src/infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
+import { DynamoDbRegistrationRateLimiter } from "../../../src/infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
 
-import type {
-  RegistrationRateLimiter,
-} from "../../../src/infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
+import type { RegistrationRateLimiter } from "../../../src/infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
 
 const TABLE_NAME = "synthetic-registration-rate-limits";
 const MAX_ATTEMPTS = 5;
@@ -43,10 +39,9 @@ function createLimiter(
 }
 
 function createConditionalCheckFailure(): Error {
-  return Object.assign(
-    new Error("Conditional check failed"),
-    { name: "ConditionalCheckFailedException" },
-  );
+  return Object.assign(new Error("Conditional check failed"), {
+    name: "ConditionalCheckFailedException",
+  });
 }
 
 describe("DynamoDbRegistrationRateLimiter", () => {
@@ -63,15 +58,11 @@ describe("DynamoDbRegistrationRateLimiter", () => {
       const result = await limiter.consume("192.0.2.10");
 
       const windowStartMilliseconds =
-        Math.floor(INITIAL_TIME / WINDOW_MILLISECONDS) *
-        WINDOW_MILLISECONDS;
+        Math.floor(INITIAL_TIME / WINDOW_MILLISECONDS) * WINDOW_MILLISECONDS;
 
-      const windowStartSeconds = Math.floor(
-        windowStartMilliseconds / 1000,
-      );
+      const windowStartSeconds = Math.floor(windowStartMilliseconds / 1000);
 
-      const expiresAt =
-        windowStartSeconds + WINDOW_SECONDS * 2;
+      const expiresAt = windowStartSeconds + WINDOW_SECONDS * 2;
 
       expect(result).toEqual({
         allowed: true,
@@ -80,9 +71,7 @@ describe("DynamoDbRegistrationRateLimiter", () => {
 
       expect(send).toHaveBeenCalledOnce();
 
-      const command = send.mock.calls[0]?.[0] as
-        | UpdateItemCommand
-        | undefined;
+      const command = send.mock.calls[0]?.[0] as UpdateItemCommand | undefined;
 
       expect(command).toBeInstanceOf(UpdateItemCommand);
 
@@ -147,8 +136,7 @@ describe("DynamoDbRegistrationRateLimiter", () => {
 
       const now = INITIAL_TIME;
       const windowStart =
-        Math.floor(now / WINDOW_MILLISECONDS) *
-        WINDOW_MILLISECONDS;
+        Math.floor(now / WINDOW_MILLISECONDS) * WINDOW_MILLISECONDS;
 
       const windowEndsAt = windowStart + WINDOW_MILLISECONDS;
 
@@ -172,8 +160,7 @@ describe("DynamoDbRegistrationRateLimiter", () => {
 
       send.mockRejectedValueOnce(createConditionalCheckFailure());
 
-      const now =
-        Date.UTC(2026, 10, 7, 10, 14, 59) + 500;
+      const now = Date.UTC(2026, 10, 7, 10, 14, 59) + 500;
 
       const limiter = createLimiter(client, {
         now: () => now,
@@ -205,12 +192,10 @@ describe("DynamoDbRegistrationRateLimiter", () => {
       expect(send).toHaveBeenCalledTimes(2);
 
       const firstCommand = send.mock.calls[0]?.[0] as
-        | UpdateItemCommand
-        | undefined;
+        UpdateItemCommand | undefined;
 
       const secondCommand = send.mock.calls[1]?.[0] as
-        | UpdateItemCommand
-        | undefined;
+        UpdateItemCommand | undefined;
 
       expect(firstCommand?.input.Key?.rate_limit_key).toEqual(
         secondCommand?.input.Key?.rate_limit_key,
@@ -224,17 +209,13 @@ describe("DynamoDbRegistrationRateLimiter", () => {
     it("propagates unexpected DynamoDB errors", async () => {
       const { client, send } = createClient();
 
-      const databaseError = new Error(
-        "Synthetic DynamoDB unavailable",
-      );
+      const databaseError = new Error("Synthetic DynamoDB unavailable");
 
       send.mockRejectedValueOnce(databaseError);
 
       const limiter = createLimiter(client);
 
-      await expect(
-        limiter.consume("192.0.2.10"),
-      ).rejects.toBe(databaseError);
+      await expect(limiter.consume("192.0.2.10")).rejects.toBe(databaseError);
     });
   });
 
@@ -265,9 +246,7 @@ describe("DynamoDbRegistrationRateLimiter", () => {
               maxAttempts,
               windowSeconds: WINDOW_SECONDS,
             }),
-        ).toThrow(
-          "Rate limit max attempts must be a positive integer.",
-        );
+        ).toThrow("Rate limit max attempts must be a positive integer.");
       }
     });
 
@@ -283,9 +262,7 @@ describe("DynamoDbRegistrationRateLimiter", () => {
               maxAttempts: MAX_ATTEMPTS,
               windowSeconds,
             }),
-        ).toThrow(
-          "Rate limit window must be a positive integer.",
-        );
+        ).toThrow("Rate limit window must be a positive integer.");
       }
     });
   });

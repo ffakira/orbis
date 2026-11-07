@@ -9,6 +9,10 @@ data "aws_secretsmanager_secret" "database" {
   name = var.database_secret_name
 }
 
+data "aws_secretsmanager_secret" "authentication" {
+  name = var.authentication_secret_name
+}
+
 module "rate_limiting" {
   source = "./modules/rate-limiting"
 
@@ -18,9 +22,10 @@ module "rate_limiting" {
 module "security" {
   source = "./modules/security"
 
-  project_name         = var.project_name
-  database_secret_arn  = data.aws_secretsmanager_secret.database.arn
-  rate_limit_table_arn = module.rate_limiting.table_arn
+  project_name              = var.project_name
+  database_secret_arn       = data.aws_secretsmanager_secret.database.arn
+  authentication_secret_arn = data.aws_secretsmanager_secret.authentication.arn
+  rate_limit_table_arn      = module.rate_limiting.table_arn
 }
 
 module "lambda" {
@@ -31,8 +36,9 @@ module "lambda" {
   package_path     = data.archive_file.lambda.output_path
   source_code_hash = data.archive_file.lambda.output_base64sha256
 
-  execution_role_arn  = module.security.execution_role_arn
-  database_secret_arn = data.aws_secretsmanager_secret.database.arn
+  execution_role_arn        = module.security.execution_role_arn
+  database_secret_arn       = data.aws_secretsmanager_secret.database.arn
+  authentication_secret_arn = data.aws_secretsmanager_secret.authentication.arn
 
   terms_of_service_version = var.terms_of_service_version
 

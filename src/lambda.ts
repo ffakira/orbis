@@ -63,8 +63,7 @@ export function createLambdaHandler({
           },
           body: JSON.stringify({
             error: "RATE_LIMIT_EXCEEDED",
-            message:
-              "Too many registration attempts. Please try again later.",
+            message: "Too many registration attempts. Please try again later.",
           }),
         };
       }

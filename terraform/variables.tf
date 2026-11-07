@@ -16,6 +16,12 @@ variable "database_secret_name" {
   default     = "restaurant-cmv-api/database"
 }
 
+variable "authentication_secret_name" {
+  description = "Secrets Manager name containing the authentication signing key"
+  type        = string
+  default     = "restaurant-cmv-api/authentication"
+}
+
 variable "terms_of_service_version" {
   description = "Version identifier of the published Terms of Service"
   type        = string

@@ -1,4 +1,4 @@
-import app from './app.js';
+import app from "./app.js";
 
 const port = Number(process.env.PORT ?? 3000);
 
@@ -11,11 +11,11 @@ const shutdown = (signal: string): void => {
 
   server.close((error) => {
     if (error) {
-      console.error('Shutdown failed:', error);
+      console.error("Shutdown failed:", error);
       process.exitCode = 1;
     }
   });
 };
 
-process.once('SIGTERM', () => shutdown('SIGTERM'));
-process.once('SIGINT', () => shutdown('SIGINT'));
+process.once("SIGTERM", () => shutdown("SIGTERM"));
+process.once("SIGINT", () => shutdown("SIGINT"));
