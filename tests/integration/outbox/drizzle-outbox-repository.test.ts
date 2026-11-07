@@ -1,12 +1,4 @@
-
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool } from "pg";
@@ -35,9 +27,11 @@ function createEvent(
     id,
     aggregateType: "user",
     aggregateId: "00000000-0000-4000-8000-000000000001",
-    eventType: "identity.user_registered.v1",
+    eventType: "identity.email_verification_requested.v1",
     payload: {
       userId: "00000000-0000-4000-8000-000000000001",
+      tokenId: "00000000-0000-4000-8000-000000000002",
+      expiresAt: "2026-11-08T15:00:00.000Z",
       occurredAt: now.toISOString(),
     },
     occurredAt: now,
@@ -104,7 +98,7 @@ describe("DrizzleOutboxRepository", () => {
     expect(claimed).toHaveLength(1);
     expect(claimed[0]).toMatchObject({
       id: eventId,
-      eventType: "identity.user_registered.v1",
+      eventType: "identity.email_verification_requested.v1",
       attempts: 1,
     });
     expect(claimed[0]?.leaseToken).toMatch(
@@ -114,9 +108,7 @@ describe("DrizzleOutboxRepository", () => {
     const [persisted] = await db.select().from(outboxEvents);
 
     expect(persisted?.leaseToken).toBe(claimed[0]?.leaseToken);
-    expect(persisted?.leaseExpiresAt).toEqual(
-      new Date(now.getTime() + 30_000),
-    );
+    expect(persisted?.leaseExpiresAt).toEqual(new Date(now.getTime() + 30_000));
     expect(persisted?.attempts).toBe(1);
   });
 
@@ -340,9 +332,7 @@ describe("DrizzleOutboxRepository", () => {
     expect(persisted?.deadLetteredAt).toEqual(failedAt);
     expect(persisted?.leaseToken).toBeNull();
     expect(persisted?.leaseExpiresAt).toBeNull();
-    expect(persisted?.lastError).toBe(
-      "Synthetic permanent publisher failure",
-    );
+    expect(persisted?.lastError).toBe("Synthetic permanent publisher failure");
 
     const claimedAgain = await repository.claimBatch({
       now: new Date(now.getTime() + 120_000),
