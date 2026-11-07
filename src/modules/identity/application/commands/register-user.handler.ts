@@ -7,11 +7,11 @@ import { EmailVerificationRequested } from "#modules/identity/domain/email-verif
 import type { RegisterUserCommand } from "#modules/identity/application/commands/register-user.schema.js";
 
 import type { Clock } from "#modules/identity/application/ports/clock.js";
-import type { IdGenerator } from "#modules/identity/application//ports/id-generator.js";
-import type { PasswordHasher } from "#modules/identity/application//ports/password-hasher.js";
-import type { TermsPolicy } from "#modules/identity/application//ports/terms-policy.js";
-import type { EmailVerificationTokenSigner } from "#modules/identity/application//ports/email-verification-token-signer.js";
-import type { IdentityUnitOfWork } from "#modules/identity/application//ports/unit-of-work.js";
+import type { IdGenerator } from "#modules/identity/application/ports/id-generator.js";
+import type { PasswordHasher } from "#modules/identity/application/ports/password-hasher.js";
+import type { TermsPolicy } from "#modules/identity/application/ports/terms-policy.js";
+import type { EmailVerificationTokenSigner } from "#modules/identity/application/ports/email-verification-token-signer.js";
+import type { IdentityUnitOfWork } from "#modules/identity/application/ports/unit-of-work.js";
 
 const EMAIL_VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
