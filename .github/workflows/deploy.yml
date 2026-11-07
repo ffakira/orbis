@@ -1,0 +1,238 @@
+name: Production Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      terms_of_service_version:
+        description: Published Terms of Service version
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orbis-production-deployment
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Pre-deployment Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Lambda package
+        run: make package
+
+      - name: Upload Lambda build
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/
+          if-no-files-found: error
+          retention-days: 1
+
+  plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    needs: preflight
+    if: github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      TERMS_OF_SERVICE_VERSION: ${{ inputs.terms_of_service_version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Download Lambda build
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: OrbisTerraformPlan
+          audience: sts.amazonaws.com
+
+      - name: Initialize Terraform
+        run: terraform -chdir=terraform init -input=false -lockfile=readonly
+
+      - name: Create saved Terraform plan
+        run: |
+          terraform -chdir=terraform plan \
+            -input=false \
+            -lock-timeout=5m \
+            -var="terms_of_service_version=${TERMS_OF_SERVICE_VERSION}" \
+            -out=tfplan
+
+      - name: Publish plan summary
+        run: |
+          terraform -chdir=terraform show -json tfplan |
+            jq -r '
+              [
+                .resource_changes[]?
+                | select(.change.actions != ["no-op"])
+                | "\(.change.actions | join(", "))  \(.address)"
+              ]
+              | if length == 0
+                then "No infrastructure changes."
+                else .[]
+                end
+            ' > /tmp/terraform-changes.txt
+
+          {
+            echo "## Terraform Plan"
+            echo
+            echo '```text'
+            cat /tmp/terraform-changes.txt
+            echo '```'
+            echo
+            echo "The saved plan is available in the workflow artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload reviewed Terraform plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            terraform/tfplan
+            terraform/lambda.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  apply:
+    name: Apply Production Deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    needs: plan
+    if: github.ref == 'refs/heads/main'
+
+    environment:
+      name: production
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Download saved Terraform plan
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: terraform
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: OrbisProductionDeployment
+          audience: sts.amazonaws.com
+
+      - name: Initialize Terraform
+        run: terraform -chdir=terraform init -input=false -lockfile=readonly
+
+      - name: Apply reviewed Terraform plan
+        run: terraform -chdir=terraform apply -input=false tfplan
+
+      - name: Get deployed API URL
+        id: deployment
+        run: |
+          API_URL="$(terraform -chdir=terraform output -raw api_url)"
+          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Verify API health
+        env:
+          API_URL: ${{ steps.deployment.outputs.api_url }}
+        run: |
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --output /dev/null \
+            --write-out 'Health endpoint: HTTP %{http_code}\n' \
+            --retry 12 \
+            --retry-all-errors \
+            --retry-delay 5 \
+            --retry-max-time 90 \
+            "$API_URL/health"
+
+      - name: Verify API readiness
+        env:
+          API_URL: ${{ steps.deployment.outputs.api_url }}
+        run: |
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --output /dev/null \
+            --write-out 'Readiness endpoint: HTTP %{http_code}\n' \
+            --retry 12 \
+            --retry-all-errors \
+            --retry-delay 5 \
+            --retry-max-time 90 \
+            "$API_URL/ready"
+
+      - name: Deployment summary
+        env:
+          API_URL: ${{ steps.deployment.outputs.api_url }}
+        run: |
+          {
+            echo "## Production Deployment"
+            echo
+            echo "- Terraform apply: successful"
+            echo "- Health check: successful"
+            echo "- Readiness check: successful"
+            echo "- API URL: $API_URL"
+          } >> "$GITHUB_STEP_SUMMARY"
