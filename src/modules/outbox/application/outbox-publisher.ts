@@ -38,7 +38,7 @@ export class OutboxPublisher {
   }
 
   async publishBatch(): Promise<OutboxPublishResult> {
-    const { clock, repository, dispatcher } = this.dependencies;
+    const { clock, repository } = this.dependencies;
 
     const events = await repository.claimBatch({
       now: clock.now(),
@@ -67,9 +67,17 @@ export class OutboxPublisher {
   ): Promise<void> {
     const { clock, dispatcher, repository } = this.dependencies;
 
+    let dispatchFailed = false;
+    let dispatchError: unknown;
+
     try {
       await dispatcher.dispatch(event);
+    } catch (error: unknown) {
+      dispatchFailed = true;
+      dispatchError = error;
+    }
 
+    if (!dispatchFailed) {
       const acknowledged = await repository.markPublished({
         eventId: event.id,
         leaseToken: event.leaseToken,
@@ -81,27 +89,29 @@ export class OutboxPublisher {
       } else {
         result.leaseLost++;
       }
-    } catch (error: unknown) {
-      const failedAt = clock.now();
 
-      const failure = await repository.markFailed({
-        eventId: event.id,
-        leaseToken: event.leaseToken,
-        failedAt,
-        nextAvailableAt: new Date(
-          failedAt.getTime() + this.calculateRetryDelay(event.attempts),
-        ),
-        error: this.getErrorMessage(error),
-        maxAttempts: this.config.maxAttempts,
-      });
+      return;
+    }
 
-      if (failure === "retry_scheduled") {
-        result.failed++;
-      } else if (failure === "dead_lettered") {
-        result.deadLettered++;
-      } else {
-        result.leaseLost++;
-      }
+    const failedAt = clock.now();
+
+    const failure = await repository.markFailed({
+      eventId: event.id,
+      leaseToken: event.leaseToken,
+      failedAt,
+      nextAvailableAt: new Date(
+        failedAt.getTime() + this.calculateRetryDelay(event.attempts),
+      ),
+      error: this.getErrorMessage(dispatchError),
+      maxAttempts: this.config.maxAttempts,
+    });
+
+    if (failure === "retry_scheduled") {
+      result.failed++;
+    } else if (failure === "dead_lettered") {
+      result.deadLettered++;
+    } else {
+      result.leaseLost++;
     }
   }
 
