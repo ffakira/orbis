@@ -18,12 +18,9 @@ variable "outbox_execution_role_arn" {
   type = string
 }
 
-variable "database_secret_arn" {
-  type = string
-}
-
-variable "authentication_secret_arn" {
-  type = string
+variable "application_secret_arn" {
+  description = "ARN of the consolidated application secret"
+  type        = string
 }
 
 variable "terms_of_service_version" {
@@ -40,14 +37,6 @@ variable "rate_limit_max_attempts" {
 
 variable "rate_limit_window_seconds" {
   type = number
-}
-
-variable "email_verification_secret_arn" {
-  type = string
-}
-
-variable "resend_secret_arn" {
-  type = string
 }
 
 variable "email_from_address" {

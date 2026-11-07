@@ -19,17 +19,14 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      NODE_ENV                  = "production"
-      LOG_LEVEL                 = "info"
-      DB_SECRET_ARN             = var.database_secret_arn
-      AUTHENTICATION_SECRET_ARN = var.authentication_secret_arn
-      TERMS_OF_SERVICE_VERSION  = var.terms_of_service_version
+      NODE_ENV                 = "production"
+      LOG_LEVEL                = "info"
+      APPLICATION_SECRET_ARN   = var.application_secret_arn
+      TERMS_OF_SERVICE_VERSION = var.terms_of_service_version
 
       REGISTRATION_RATE_LIMIT_TABLE_NAME     = var.rate_limit_table_name
       REGISTRATION_RATE_LIMIT_MAX_ATTEMPTS   = tostring(var.rate_limit_max_attempts)
       REGISTRATION_RATE_LIMIT_WINDOW_SECONDS = tostring(var.rate_limit_window_seconds)
-
-      EMAIL_VERIFICATION_SECRET_ARN = var.email_verification_secret_arn
     }
   }
 }
@@ -49,20 +46,15 @@ resource "aws_lambda_function" "outbox" {
   memory_size = 256
   timeout     = 60
 
-  reserved_concurrent_executions = 1
-
   layers = [
     "arn:aws:lambda:us-east-1:177933569100:layer:AWS-Parameters-and-Secrets-Lambda-Extension:171"
   ]
 
   environment {
     variables = {
-      NODE_ENV      = "production"
-      LOG_LEVEL     = "info"
-      DB_SECRET_ARN = var.database_secret_arn
-
-      EMAIL_VERIFICATION_SECRET_ARN = var.email_verification_secret_arn
-      RESEND_SECRET_ARN             = var.resend_secret_arn
+      NODE_ENV               = "production"
+      LOG_LEVEL              = "info"
+      APPLICATION_SECRET_ARN = var.application_secret_arn
 
       EMAIL_FROM_ADDRESS = var.email_from_address
       PUBLIC_APP_URL     = var.public_app_url

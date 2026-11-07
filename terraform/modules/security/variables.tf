@@ -2,22 +2,11 @@ variable "project_name" {
   type = string
 }
 
-variable "database_secret_arn" {
-  type = string
-}
-
-variable "authentication_secret_arn" {
-  type = string
+variable "application_secret_arn" {
+  description = "ARN of the consolidated application secret"
+  type        = string
 }
 
 variable "rate_limit_table_arn" {
-  type = string
-}
-
-variable "email_verification_secret_arn" {
-  type = string
-}
-
-variable "resend_secret_arn" {
   type = string
 }

@@ -1,12 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const validEmailVerificationSecret = Buffer.from(
-  "synthetic-email-verification-secret-with-at-least-32-bytes",
+const validBase64Secret = Buffer.from(
+  "synthetic-secret-with-at-least-32-random-bytes",
   "utf8",
 ).toString("base64");
 
+const validApplicationSecret = {
+  DATABASE_URL: "postgresql://user:password@localhost:5432/test",
+  JWT_SECRET: validBase64Secret,
+  EMAIL_VERIFICATION_SECRET: validBase64Secret,
+  RESEND_API_KEY: "re_test_synthetic_api_key",
+};
+
 async function loadSecretsManager() {
   return import("#infrastructure/secrets/secrets-manager.js");
+}
+
+function configureLocalEnvironment(overrides: Record<string, string> = {}) {
+  vi.stubEnv("APPLICATION_SECRET_ARN", "");
+
+  vi.stubEnv("DATABASE_URL", validApplicationSecret.DATABASE_URL);
+  vi.stubEnv("JWT_SECRET", validApplicationSecret.JWT_SECRET);
+  vi.stubEnv(
+    "EMAIL_VERIFICATION_SECRET",
+    validApplicationSecret.EMAIL_VERIFICATION_SECRET,
+  );
+  vi.stubEnv("RESEND_API_KEY", validApplicationSecret.RESEND_API_KEY);
+
+  for (const [key, value] of Object.entries(overrides)) {
+    vi.stubEnv(key, value);
+  }
 }
 
 function mockSecretsExtension(secretString: string, status = 200) {
@@ -28,7 +51,7 @@ function mockSecretsExtension(secretString: string, status = 200) {
   return fetchMock;
 }
 
-describe("Secrets Manager email verification secret", () => {
+describe("Secrets Manager application secret", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.unstubAllEnvs();
@@ -41,39 +64,78 @@ describe("Secrets Manager email verification secret", () => {
     vi.resetModules();
   });
 
-  it("loads the email verification secret from local environment configuration", async () => {
-    vi.stubEnv("EMAIL_VERIFICATION_SECRET_ARN", "");
-    vi.stubEnv("EMAIL_VERIFICATION_SECRET", validEmailVerificationSecret);
+  it("loads all credentials from local environment configuration", async () => {
+    configureLocalEnvironment();
 
-    const { getEmailVerificationSecret } = await loadSecretsManager();
+    const {
+      getDatabaseSecret,
+      getAuthenticationSecret,
+      getEmailVerificationSecret,
+      getResendSecret,
+    } = await loadSecretsManager();
 
-    const result = await getEmailVerificationSecret();
+    const [database, authentication, emailVerification, resend] =
+      await Promise.all([
+        getDatabaseSecret(),
+        getAuthenticationSecret(),
+        getEmailVerificationSecret(),
+        getResendSecret(),
+      ]);
+
+    expect(database.DATABASE_URL).toBe(validApplicationSecret.DATABASE_URL);
+
+    expect(Buffer.from(authentication.JWT_SECRET).toString("base64")).toBe(
+      validBase64Secret,
+    );
 
     expect(
-      Buffer.from(result.EMAIL_VERIFICATION_SECRET).toString("base64"),
-    ).toBe(validEmailVerificationSecret);
+      Buffer.from(emailVerification.EMAIL_VERIFICATION_SECRET).toString(
+        "base64",
+      ),
+    ).toBe(validBase64Secret);
+
+    expect(resend.RESEND_API_KEY).toBe(validApplicationSecret.RESEND_API_KEY);
   });
 
-  it("retrieves the email verification secret through the Lambda extension", async () => {
+  it("retrieves the consolidated secret through the Lambda extension", async () => {
     const secretArn =
-      "arn:aws:secretsmanager:us-east-1:123456789012:secret:email-verification";
+      "arn:aws:secretsmanager:us-east-1:123456789012:secret:application";
 
-    vi.stubEnv("EMAIL_VERIFICATION_SECRET_ARN", secretArn);
+    vi.stubEnv("APPLICATION_SECRET_ARN", secretArn);
     vi.stubEnv("AWS_SESSION_TOKEN", "test-session-token");
 
     const fetchMock = mockSecretsExtension(
-      JSON.stringify({
-        EMAIL_VERIFICATION_SECRET: validEmailVerificationSecret,
-      }),
+      JSON.stringify(validApplicationSecret),
     );
 
-    const { getEmailVerificationSecret } = await loadSecretsManager();
+    const {
+      getDatabaseSecret,
+      getAuthenticationSecret,
+      getEmailVerificationSecret,
+      getResendSecret,
+    } = await loadSecretsManager();
 
-    const result = await getEmailVerificationSecret();
+    const [database, authentication, emailVerification, resend] =
+      await Promise.all([
+        getDatabaseSecret(),
+        getAuthenticationSecret(),
+        getEmailVerificationSecret(),
+        getResendSecret(),
+      ]);
+
+    expect(database.DATABASE_URL).toBe(validApplicationSecret.DATABASE_URL);
+
+    expect(Buffer.from(authentication.JWT_SECRET).toString("base64")).toBe(
+      validBase64Secret,
+    );
 
     expect(
-      Buffer.from(result.EMAIL_VERIFICATION_SECRET).toString("base64"),
-    ).toBe(validEmailVerificationSecret);
+      Buffer.from(emailVerification.EMAIL_VERIFICATION_SECRET).toString(
+        "base64",
+      ),
+    ).toBe(validBase64Secret);
+
+    expect(resend.RESEND_API_KEY).toBe(validApplicationSecret.RESEND_API_KEY);
 
     expect(fetchMock).toHaveBeenCalledOnce();
 
@@ -88,9 +150,10 @@ describe("Secrets Manager email verification secret", () => {
     });
   });
 
-  it("rejects an email verification secret with invalid Base64", async () => {
-    vi.stubEnv("EMAIL_VERIFICATION_SECRET_ARN", "");
-    vi.stubEnv("EMAIL_VERIFICATION_SECRET", "invalid-base64!");
+  it("rejects an invalid email verification Base64 value", async () => {
+    configureLocalEnvironment({
+      EMAIL_VERIFICATION_SECRET: "invalid-base64!",
+    });
 
     const { getEmailVerificationSecret } = await loadSecretsManager();
 
@@ -100,11 +163,9 @@ describe("Secrets Manager email verification secret", () => {
   });
 
   it("rejects an email verification secret shorter than 32 bytes", async () => {
-    vi.stubEnv("EMAIL_VERIFICATION_SECRET_ARN", "");
-    vi.stubEnv(
-      "EMAIL_VERIFICATION_SECRET",
-      Buffer.from("too-short").toString("base64"),
-    );
+    configureLocalEnvironment({
+      EMAIL_VERIFICATION_SECRET: Buffer.from("too-short").toString("base64"),
+    });
 
     const { getEmailVerificationSecret } = await loadSecretsManager();
 
@@ -113,30 +174,52 @@ describe("Secrets Manager email verification secret", () => {
     );
   });
 
-  it("rejects a secret without EMAIL_VERIFICATION_SECRET", async () => {
-    vi.stubEnv(
-      "EMAIL_VERIFICATION_SECRET_ARN",
-      "arn:aws:secretsmanager:us-east-1:123456789012:secret:email-verification",
-    );
+  it("rejects a consolidated secret missing a required property", async () => {
+    const secretArn =
+      "arn:aws:secretsmanager:us-east-1:123456789012:secret:application";
+
+    const incompleteSecret = {
+      DATABASE_URL: validApplicationSecret.DATABASE_URL,
+      JWT_SECRET: validApplicationSecret.JWT_SECRET,
+      RESEND_API_KEY: validApplicationSecret.RESEND_API_KEY,
+    };
+
+    vi.stubEnv("APPLICATION_SECRET_ARN", secretArn);
     vi.stubEnv("AWS_SESSION_TOKEN", "test-session-token");
 
-    mockSecretsExtension(JSON.stringify({ OTHER_SECRET: "value" }));
+    mockSecretsExtension(JSON.stringify(incompleteSecret));
 
     const { getEmailVerificationSecret } = await loadSecretsManager();
 
     await expect(getEmailVerificationSecret()).rejects.toThrow(
-      "EMAIL_VERIFICATION_SECRET is missing",
+      "EMAIL_VERIFICATION_SECRET is missing or empty",
     );
   });
 
-  it("rejects missing email verification configuration", async () => {
-    vi.stubEnv("EMAIL_VERIFICATION_SECRET_ARN", "");
-    vi.stubEnv("EMAIL_VERIFICATION_SECRET", "");
+  it("rejects missing application secret configuration", async () => {
+    configureLocalEnvironment({
+      DATABASE_URL: "",
+      JWT_SECRET: "",
+      EMAIL_VERIFICATION_SECRET: "",
+      RESEND_API_KEY: "",
+    });
 
-    const { getEmailVerificationSecret } = await loadSecretsManager();
+    const { getDatabaseSecret } = await loadSecretsManager();
 
-    await expect(getEmailVerificationSecret()).rejects.toThrow(
-      "Neither EMAIL_VERIFICATION_SECRET_ARN nor EMAIL_VERIFICATION_SECRET is configured",
+    await expect(getDatabaseSecret()).rejects.toThrow(
+      "APPLICATION_SECRET_ARN or all four application secret environment variables must be configured",
+    );
+  });
+
+  it("rejects an invalid database URL", async () => {
+    configureLocalEnvironment({
+      DATABASE_URL: "https://invalid-database.example.com",
+    });
+
+    const { getDatabaseSecret } = await loadSecretsManager();
+
+    await expect(getDatabaseSecret()).rejects.toThrow(
+      "Invalid application secret: database URL protocol",
     );
   });
 });

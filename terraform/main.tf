@@ -5,20 +5,8 @@ data "archive_file" "lambda" {
   output_path = "${path.module}/lambda.zip"
 }
 
-data "aws_secretsmanager_secret" "database" {
-  name = var.database_secret_name
-}
-
-data "aws_secretsmanager_secret" "authentication" {
-  name = var.authentication_secret_name
-}
-
-data "aws_secretsmanager_secret" "email_verification" {
-  name = var.email_verification_secret_name
-}
-
-data "aws_secretsmanager_secret" "resend" {
-  name = var.resend_secret_name
+data "aws_secretsmanager_secret" "application" {
+  name = var.application_secret_name
 }
 
 module "rate_limiting" {
@@ -30,12 +18,9 @@ module "rate_limiting" {
 module "security" {
   source = "./modules/security"
 
-  project_name                  = var.project_name
-  database_secret_arn           = data.aws_secretsmanager_secret.database.arn
-  authentication_secret_arn     = data.aws_secretsmanager_secret.authentication.arn
-  rate_limit_table_arn          = module.rate_limiting.table_arn
-  email_verification_secret_arn = data.aws_secretsmanager_secret.email_verification.arn
-  resend_secret_arn             = data.aws_secretsmanager_secret.resend.arn
+  project_name           = var.project_name
+  application_secret_arn = data.aws_secretsmanager_secret.application.arn
+  rate_limit_table_arn   = module.rate_limiting.table_arn
 }
 
 module "lambda" {
@@ -49,8 +34,7 @@ module "lambda" {
   execution_role_arn        = module.security.execution_role_arn
   outbox_execution_role_arn = module.security.outbox_execution_role_arn
 
-  database_secret_arn       = data.aws_secretsmanager_secret.database.arn
-  authentication_secret_arn = data.aws_secretsmanager_secret.authentication.arn
+  application_secret_arn = data.aws_secretsmanager_secret.application.arn
 
   terms_of_service_version = var.terms_of_service_version
 
@@ -59,9 +43,6 @@ module "lambda" {
   rate_limit_window_seconds = var.registration_rate_limit_window_seconds
 
   outbox_schedule_expression = var.outbox_schedule_expression
-
-  email_verification_secret_arn = data.aws_secretsmanager_secret.email_verification.arn
-  resend_secret_arn             = data.aws_secretsmanager_secret.resend.arn
 
   email_from_address = var.email_from_address
   public_app_url     = var.public_app_url

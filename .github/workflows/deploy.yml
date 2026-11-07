@@ -1,12 +1,11 @@
 name: Production Deployment
 
 on:
+  push:
+    branches:
+      - main
+
   workflow_dispatch:
-    inputs:
-      terms_of_service_version:
-        description: Published Terms of Service version
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -20,8 +19,6 @@ jobs:
     name: Pre-deployment Checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
-    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout repository
@@ -56,7 +53,6 @@ jobs:
     timeout-minutes: 20
 
     needs: preflight
-    if: github.ref == 'refs/heads/main'
 
     permissions:
       contents: read
@@ -65,11 +61,32 @@ jobs:
     env:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
-      TERMS_OF_SERVICE_VERSION: ${{ inputs.terms_of_service_version }}
+
+      TF_VAR_terms_of_service_version: ${{ vars.TERMS_OF_SERVICE_VERSION }}
+      TF_VAR_email_from_address: ${{ vars.EMAIL_FROM_ADDRESS }}
+      TF_VAR_public_app_url: ${{ vars.PUBLIC_APP_URL }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required_variables=(
+            TF_VAR_terms_of_service_version
+            TF_VAR_email_from_address
+            TF_VAR_public_app_url
+          )
+
+          for variable in "${required_variables[@]}"; do
+            if [[ -z "${!variable:-}" ]]; then
+              echo "::error::Required GitHub repository variable is missing: ${variable#TF_VAR_}"
+              exit 1
+            fi
+          done
 
       - name: Download Lambda build
         uses: actions/download-artifact@v4
@@ -99,7 +116,6 @@ jobs:
           terraform -chdir=terraform plan \
             -input=false \
             -lock-timeout=5m \
-            -var="terms_of_service_version=${TERMS_OF_SERVICE_VERSION}" \
             -out=tfplan
 
       - name: Publish plan summary
@@ -143,7 +159,6 @@ jobs:
     timeout-minutes: 20
 
     needs: plan
-    if: github.ref == 'refs/heads/main'
 
     environment:
       name: production

@@ -39,17 +39,15 @@ resource "aws_iam_role_policy" "lambda_secrets_access" {
         ]
 
         Resource = [
-          var.database_secret_arn,
-          var.authentication_secret_arn,
-          var.email_verification_secret_arn
+          var.application_secret_arn
         ]
       }
     ]
   })
 }
 
-resource "aws_iam_role_policy" "lambda_rate_limit_access" {
-  name = "${var.project_name}-rate-limit-access"
+resource "aws_iam_role_policy" "lambda_registration_rate_limit_access" {
+  name = "${var.project_name}-registration-rate-limit-access"
   role = aws_iam_role.lambda_execution_role.id
 
   policy = jsonencode({
@@ -112,9 +110,7 @@ resource "aws_iam_role_policy" "outbox_lambda_secrets_access" {
         ]
 
         Resource = [
-          var.database_secret_arn,
-          var.email_verification_secret_arn,
-          var.resend_secret_arn
+          var.application_secret_arn
         ]
       }
     ]

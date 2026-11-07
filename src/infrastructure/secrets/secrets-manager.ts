@@ -2,6 +2,13 @@ import "#config/env.js";
 
 import { Buffer } from "node:buffer";
 
+interface ApplicationSecret {
+  DATABASE_URL: string;
+  JWT_SECRET: string;
+  EMAIL_VERIFICATION_SECRET: string;
+  RESEND_API_KEY: string;
+}
+
 interface DatabaseSecret {
   DATABASE_URL: string;
 }
@@ -22,28 +29,17 @@ interface SecretsManagerResponse {
   SecretString?: string;
 }
 
-let databaseSecretPromise: Promise<DatabaseSecret> | undefined;
-let authenticationSecretPromise: Promise<AuthenticationSecret> | undefined;
-let emailVerificationSecretPromise:
-  | Promise<EmailVerificationSecret>
-  | undefined;
-let resendSecretPromise: Promise<ResendSecret> | undefined;
+let applicationSecretPromise: Promise<ApplicationSecret> | undefined;
 
-function parseSecretString(
-  secretString: string,
-  secretName: string,
-): unknown {
+function parseSecretString(secretString: string): unknown {
   try {
     return JSON.parse(secretString);
   } catch {
-    throw new Error(`${secretName} secret contains invalid JSON`);
+    throw new Error("Application secret contains invalid JSON");
   }
 }
 
-async function retrieveSecretString(
-  secretArn: string,
-  secretName: string,
-): Promise<string> {
+async function retrieveSecretString(secretArn: string): Promise<string> {
   const sessionToken = process.env.AWS_SESSION_TOKEN;
 
   if (!sessionToken) {
@@ -51,10 +47,8 @@ async function retrieveSecretString(
   }
 
   const port = process.env.PARAMETERS_SECRETS_EXTENSION_HTTP_PORT ?? "2773";
+  const url = new URL(`http://localhost:${port}/secretsmanager/get`);
 
-  const url = new URL(
-    `http://localhost:${port}/secretsmanager/get`,
-  );
   url.searchParams.set("secretId", secretArn);
 
   const response = await fetch(url, {
@@ -67,14 +61,14 @@ async function retrieveSecretString(
 
   if (!response.ok) {
     throw new Error(
-      `Secrets Manager extension returned HTTP ${response.status} while retrieving ${secretName}`,
+      `Secrets Manager extension returned HTTP ${response.status} while retrieving the application secret`,
     );
   }
 
   const result = (await response.json()) as SecretsManagerResponse;
 
   if (!result.SecretString) {
-    throw new Error(`${secretName} secret has no SecretString`);
+    throw new Error("Application secret has no SecretString");
   }
 
   return result.SecretString;
@@ -105,214 +99,116 @@ function decodeBase64Secret(
   return decodedSecret;
 }
 
-function validateDatabaseSecret(value: unknown): DatabaseSecret {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    !("DATABASE_URL" in value) ||
-    typeof value.DATABASE_URL !== "string" ||
-    value.DATABASE_URL.trim() === ""
-  ) {
-    throw new Error("Invalid database secret: DATABASE_URL is missing");
+function validateApplicationSecret(value: unknown): ApplicationSecret {
+  if (typeof value !== "object" || value === null) {
+    throw new Error("Invalid application secret: expected a JSON object");
   }
 
-  const connectionString = value.DATABASE_URL;
-  const url = new URL(connectionString);
+  const candidate = value as Record<string, unknown>;
 
-  if (!["postgres:", "postgresql:"].includes(url.protocol)) {
-    throw new Error("Invalid database URL protocol");
+  const requiredKeys = [
+    "DATABASE_URL",
+    "JWT_SECRET",
+    "EMAIL_VERIFICATION_SECRET",
+    "RESEND_API_KEY",
+  ] as const;
+
+  for (const key of requiredKeys) {
+    if (typeof candidate[key] !== "string" || candidate[key].trim() === "") {
+      throw new Error(`Invalid application secret: ${key} is missing or empty`);
+    }
   }
 
-  return { DATABASE_URL: connectionString };
-}
+  const databaseUrl = candidate.DATABASE_URL as string;
+  const parsedDatabaseUrl = new URL(databaseUrl);
 
-function validateAuthenticationSecret(
-  value: unknown,
-): AuthenticationSecret {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    !("JWT_SECRET" in value) ||
-    typeof value.JWT_SECRET !== "string" ||
-    value.JWT_SECRET.trim() === ""
-  ) {
-    throw new Error("Invalid authentication secret: JWT_SECRET is missing");
+  if (!["postgres:", "postgresql:"].includes(parsedDatabaseUrl.protocol)) {
+    throw new Error("Invalid application secret: database URL protocol");
   }
 
   return {
-    JWT_SECRET: decodeBase64Secret(value.JWT_SECRET, "authentication"),
+    DATABASE_URL: databaseUrl,
+    JWT_SECRET: candidate.JWT_SECRET as string,
+    EMAIL_VERIFICATION_SECRET: candidate.EMAIL_VERIFICATION_SECRET as string,
+    RESEND_API_KEY: candidate.RESEND_API_KEY as string,
   };
 }
 
-function validateEmailVerificationSecret(
-  value: unknown,
-): EmailVerificationSecret {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    !("EMAIL_VERIFICATION_SECRET" in value) ||
-    typeof value.EMAIL_VERIFICATION_SECRET !== "string" ||
-    value.EMAIL_VERIFICATION_SECRET.trim() === ""
-  ) {
-    throw new Error(
-      "Invalid email verification secret: EMAIL_VERIFICATION_SECRET is missing",
-    );
+async function retrieveApplicationSecret(): Promise<ApplicationSecret> {
+  const secretArn = process.env.APPLICATION_SECRET_ARN;
+
+  if (!secretArn) {
+    const databaseUrl = process.env.DATABASE_URL;
+    const jwtSecret = process.env.JWT_SECRET;
+    const emailVerificationSecret = process.env.EMAIL_VERIFICATION_SECRET;
+    const resendApiKey = process.env.RESEND_API_KEY;
+
+    if (
+      !databaseUrl ||
+      !jwtSecret ||
+      !emailVerificationSecret ||
+      !resendApiKey
+    ) {
+      throw new Error(
+        "APPLICATION_SECRET_ARN or all four application secret environment variables must be configured",
+      );
+    }
+
+    return validateApplicationSecret({
+      DATABASE_URL: databaseUrl,
+      JWT_SECRET: jwtSecret,
+      EMAIL_VERIFICATION_SECRET: emailVerificationSecret,
+      RESEND_API_KEY: resendApiKey,
+    });
   }
+
+  const secretString = await retrieveSecretString(secretArn);
+
+  return validateApplicationSecret(parseSecretString(secretString));
+}
+
+function getApplicationSecret(): Promise<ApplicationSecret> {
+  applicationSecretPromise ??= retrieveApplicationSecret().catch(
+    (error: unknown) => {
+      applicationSecretPromise = undefined;
+      throw error;
+    },
+  );
+
+  return applicationSecretPromise;
+}
+
+export async function getDatabaseSecret(): Promise<DatabaseSecret> {
+  const secret = await getApplicationSecret();
+
+  return {
+    DATABASE_URL: secret.DATABASE_URL,
+  };
+}
+
+export async function getAuthenticationSecret(): Promise<AuthenticationSecret> {
+  const secret = await getApplicationSecret();
+
+  return {
+    JWT_SECRET: decodeBase64Secret(secret.JWT_SECRET, "authentication"),
+  };
+}
+
+export async function getEmailVerificationSecret(): Promise<EmailVerificationSecret> {
+  const secret = await getApplicationSecret();
 
   return {
     EMAIL_VERIFICATION_SECRET: decodeBase64Secret(
-      value.EMAIL_VERIFICATION_SECRET,
+      secret.EMAIL_VERIFICATION_SECRET,
       "email verification",
     ),
   };
 }
 
-function validateResendSecret(value: unknown): ResendSecret {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    !("RESEND_API_KEY" in value) ||
-    typeof value.RESEND_API_KEY !== "string" ||
-    value.RESEND_API_KEY.trim() === ""
-  ) {
-    throw new Error("Invalid Resend secret: RESEND_API_KEY is missing");
-  }
+export async function getResendSecret(): Promise<ResendSecret> {
+  const secret = await getApplicationSecret();
 
   return {
-    RESEND_API_KEY: value.RESEND_API_KEY,
+    RESEND_API_KEY: secret.RESEND_API_KEY,
   };
-}
-
-async function retrieveDatabaseSecret(): Promise<DatabaseSecret> {
-  const secretArn = process.env.DB_SECRET_ARN;
-
-  if (!secretArn) {
-    const databaseUrl = process.env.DATABASE_URL;
-
-    if (!databaseUrl) {
-      throw new Error("Neither DB_SECRET_ARN nor DATABASE_URL is configured");
-    }
-
-    return validateDatabaseSecret({ DATABASE_URL: databaseUrl });
-  }
-
-  const secretString = await retrieveSecretString(secretArn, "Database");
-
-  return validateDatabaseSecret(parseSecretString(secretString, "Database"));
-}
-
-async function retrieveAuthenticationSecret(): Promise<AuthenticationSecret> {
-  const secretArn = process.env.AUTHENTICATION_SECRET_ARN;
-
-  if (!secretArn) {
-    const jwtSecret = process.env.JWT_SECRET;
-
-    if (!jwtSecret) {
-      throw new Error(
-        "Neither AUTHENTICATION_SECRET_ARN nor JWT_SECRET is configured",
-      );
-    }
-
-    return validateAuthenticationSecret({ JWT_SECRET: jwtSecret });
-  }
-
-  const secretString = await retrieveSecretString(secretArn, "Authentication");
-
-  return validateAuthenticationSecret(
-    parseSecretString(secretString, "Authentication"),
-  );
-}
-
-async function retrieveEmailVerificationSecret(): Promise<EmailVerificationSecret> {
-  const secretArn = process.env.EMAIL_VERIFICATION_SECRET_ARN;
-
-  if (!secretArn) {
-    const emailVerificationSecret =
-      process.env.EMAIL_VERIFICATION_SECRET;
-
-    if (!emailVerificationSecret) {
-      throw new Error(
-        "Neither EMAIL_VERIFICATION_SECRET_ARN nor EMAIL_VERIFICATION_SECRET is configured",
-      );
-    }
-
-    return validateEmailVerificationSecret({
-      EMAIL_VERIFICATION_SECRET: emailVerificationSecret,
-    });
-  }
-
-  const secretString = await retrieveSecretString(
-    secretArn,
-    "Email verification",
-  );
-
-  return validateEmailVerificationSecret(
-    parseSecretString(secretString, "Email verification"),
-  );
-}
-
-async function retrieveResendSecret(): Promise<ResendSecret> {
-  const secretArn = process.env.RESEND_SECRET_ARN;
-
-  if (!secretArn) {
-    const apiKey = process.env.RESEND_API_KEY;
-
-    if (!apiKey) {
-      throw new Error(
-        "Neither RESEND_SECRET_ARN nor RESEND_API_KEY is configured",
-      );
-    }
-
-    return validateResendSecret({ RESEND_API_KEY: apiKey });
-  }
-
-  const secretString = await retrieveSecretString(secretArn, "Resend");
-
-  return validateResendSecret(
-    parseSecretString(secretString, "Resend"),
-  );
-}
-
-export function getDatabaseSecret(): Promise<DatabaseSecret> {
-  databaseSecretPromise ??= retrieveDatabaseSecret().catch(
-    (error: unknown) => {
-      databaseSecretPromise = undefined;
-      throw error;
-    },
-  );
-
-  return databaseSecretPromise;
-}
-
-export function getAuthenticationSecret(): Promise<AuthenticationSecret> {
-  authenticationSecretPromise ??= retrieveAuthenticationSecret().catch(
-    (error: unknown) => {
-      authenticationSecretPromise = undefined;
-      throw error;
-    },
-  );
-
-  return authenticationSecretPromise;
-}
-
-export function getEmailVerificationSecret(): Promise<EmailVerificationSecret> {
-  emailVerificationSecretPromise ??= retrieveEmailVerificationSecret().catch(
-    (error: unknown) => {
-      emailVerificationSecretPromise = undefined;
-      throw error;
-    },
-  );
-
-  return emailVerificationSecretPromise;
-}
-
-export function getResendSecret(): Promise<ResendSecret> {
-  resendSecretPromise ??= retrieveResendSecret().catch(
-    (error: unknown) => {
-      resendSecretPromise = undefined;
-      throw error;
-    },
-  );
-
-  return resendSecretPromise;
 }

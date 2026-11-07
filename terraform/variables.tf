@@ -10,16 +10,10 @@ variable "project_name" {
   default     = "restaurant-cmv-api"
 }
 
-variable "database_secret_name" {
-  description = "Secrets Manager name containing the Neon connection string"
+variable "application_secret_name" {
+  description = "Secrets Manager name containing all application credentials"
   type        = string
-  default     = "restaurant-cmv-api/database"
-}
-
-variable "authentication_secret_name" {
-  description = "Secrets Manager name containing the authentication signing key"
-  type        = string
-  default     = "restaurant-cmv-api/authentication"
+  default     = "restaurant-cmv-api/application"
 }
 
 variable "terms_of_service_version" {
@@ -80,18 +74,6 @@ variable "registration_rate_limit_window_seconds" {
     )
     error_message = "Registration rate limit window must be a positive integer."
   }
-}
-
-variable "email_verification_secret_name" {
-  description = "Secrets Manager name containing the email verification signing key"
-  type        = string
-  default     = "restaurant-cmv-api/email-verification"
-}
-
-variable "resend_secret_name" {
-  description = "Secrets Manager name containing the Resend API key"
-  type        = string
-  default     = "restaurant-cmv-api/resend"
 }
 
 variable "email_from_address" {
