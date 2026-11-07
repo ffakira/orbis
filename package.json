@@ -23,6 +23,7 @@
     "express": "^5.3.0",
     "jose": "^6.2.15",
     "pg": "^8.23.1",
+    "resend": "^6.37.0",
     "serverless-http": "^4.0.0",
     "zod": "^4.6.7"
   },
@@ -61,5 +62,11 @@
       "development": "./src/modules/*",
       "default": "./dist/modules/*"
     }
+  },
+  "allowScripts": {
+    "argon2@0.45.2": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.18.20": true
   }
 }

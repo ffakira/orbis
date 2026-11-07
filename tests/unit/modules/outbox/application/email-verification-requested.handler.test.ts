@@ -92,10 +92,7 @@ function createHandler(
 
 describe("EmailVerificationRequestedHandler", () => {
   it("sends a verification email for a valid event", async () => {
-    const {
-      handler,
-      emailSender,
-    } = createHandler();
+    const { handler, emailSender } = createHandler();
 
     await handler.handle(event);
 
@@ -104,15 +101,13 @@ describe("EmailVerificationRequestedHandler", () => {
     expect(emailSender.send).toHaveBeenCalledWith({
       to: recipient.email,
       subject: "Verify your email address",
+      idempotencyKey: `email-verification/${event.id}`,
       ...renderedEmail,
     });
   });
 
   it("derives the verification token using the event context", async () => {
-    const {
-      handler,
-      tokenSigner,
-    } = createHandler();
+    const { handler, tokenSigner } = createHandler();
 
     await handler.handle(event);
 
@@ -128,10 +123,7 @@ describe("EmailVerificationRequestedHandler", () => {
   });
 
   it("builds the verification URL using the derived token", async () => {
-    const {
-      handler,
-      buildVerificationUrl,
-    } = createHandler();
+    const { handler, buildVerificationUrl } = createHandler();
 
     await handler.handle(event);
 
@@ -143,10 +135,7 @@ describe("EmailVerificationRequestedHandler", () => {
   });
 
   it("renders the email using the recipient name and verification URL", async () => {
-    const {
-      handler,
-      emailTemplateRenderer,
-    } = createHandler();
+    const { handler, emailTemplateRenderer } = createHandler();
 
     await handler.handle(event);
 
@@ -218,11 +207,7 @@ describe("EmailVerificationRequestedHandler", () => {
   });
 
   it("rejects an event with an unexpected event type", async () => {
-    const {
-      handler,
-      recipients,
-      emailSender,
-    } = createHandler();
+    const { handler, recipients, emailSender } = createHandler();
 
     const unexpectedEvent: ClaimedOutboxEvent = {
       ...event,
@@ -240,11 +225,7 @@ describe("EmailVerificationRequestedHandler", () => {
   });
 
   it("rejects an event with an invalid payload", async () => {
-    const {
-      handler,
-      recipients,
-      emailSender,
-    } = createHandler();
+    const { handler, recipients, emailSender } = createHandler();
 
     const invalidEvent: ClaimedOutboxEvent = {
       ...event,
@@ -271,9 +252,7 @@ describe("EmailVerificationRequestedHandler", () => {
       }),
     };
 
-    const {
-      handler,
-    } = createHandler({ emailSender });
+    const { handler } = createHandler({ emailSender });
 
     await expect(
       handler.handle(event),

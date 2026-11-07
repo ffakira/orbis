@@ -66,6 +66,7 @@ export class EmailVerificationRequestedHandler implements OutboxEventHandler {
     await this.dependencies.emailSender.send({
       to: recipient.email,
       subject: "Verify your email address",
+      idempotencyKey: `email-verification/${event.id}`,
       ...renderedEmail,
     });
   }
