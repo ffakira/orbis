@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const validJwtSecret = Buffer.from(
-  "0123456789abcdef0123456789abcdef0123456789abcdef",
+const validEmailVerificationSecret = Buffer.from(
+  "synthetic-email-verification-secret-with-at-least-32-bytes",
+  "utf8",
 ).toString("base64");
 
 async function loadSecretsManager() {
@@ -27,7 +28,7 @@ function mockSecretsExtension(secretString: string, status = 200) {
   return fetchMock;
 }
 
-describe("Secrets Manager authentication secret", () => {
+describe("Secrets Manager email verification secret", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.unstubAllEnvs();
@@ -40,37 +41,39 @@ describe("Secrets Manager authentication secret", () => {
     vi.resetModules();
   });
 
-  it("loads the authentication secret from local environment configuration", async () => {
-    vi.stubEnv("AUTHENTICATION_SECRET_ARN", "");
-    vi.stubEnv("JWT_SECRET", validJwtSecret);
+  it("loads the email verification secret from local environment configuration", async () => {
+    vi.stubEnv("EMAIL_VERIFICATION_SECRET_ARN", "");
+    vi.stubEnv("EMAIL_VERIFICATION_SECRET", validEmailVerificationSecret);
 
-    const { getAuthenticationSecret } = await loadSecretsManager();
+    const { getEmailVerificationSecret } = await loadSecretsManager();
 
-    const result = await getAuthenticationSecret();
+    const result = await getEmailVerificationSecret();
 
-    expect(Buffer.from(result.JWT_SECRET).toString("base64")).toBe(
-      validJwtSecret,
-    );
+    expect(
+      Buffer.from(result.EMAIL_VERIFICATION_SECRET).toString("base64"),
+    ).toBe(validEmailVerificationSecret);
   });
 
-  it("retrieves and decodes the authentication secret through the Lambda extension", async () => {
+  it("retrieves the email verification secret through the Lambda extension", async () => {
     const secretArn =
-      "arn:aws:secretsmanager:us-east-1:123456789012:secret:test";
+      "arn:aws:secretsmanager:us-east-1:123456789012:secret:email-verification";
 
-    vi.stubEnv("AUTHENTICATION_SECRET_ARN", secretArn);
+    vi.stubEnv("EMAIL_VERIFICATION_SECRET_ARN", secretArn);
     vi.stubEnv("AWS_SESSION_TOKEN", "test-session-token");
 
     const fetchMock = mockSecretsExtension(
-      JSON.stringify({ JWT_SECRET: validJwtSecret }),
+      JSON.stringify({
+        EMAIL_VERIFICATION_SECRET: validEmailVerificationSecret,
+      }),
     );
 
-    const { getAuthenticationSecret } = await loadSecretsManager();
+    const { getEmailVerificationSecret } = await loadSecretsManager();
 
-    const result = await getAuthenticationSecret();
+    const result = await getEmailVerificationSecret();
 
-    expect(Buffer.from(result.JWT_SECRET).toString("base64")).toBe(
-      validJwtSecret,
-    );
+    expect(
+      Buffer.from(result.EMAIL_VERIFICATION_SECRET).toString("base64"),
+    ).toBe(validEmailVerificationSecret);
 
     expect(fetchMock).toHaveBeenCalledOnce();
 
@@ -85,68 +88,55 @@ describe("Secrets Manager authentication secret", () => {
     });
   });
 
-  it("rejects an authentication secret with invalid Base64", async () => {
-    vi.stubEnv("AUTHENTICATION_SECRET_ARN", "");
-    vi.stubEnv("JWT_SECRET", "not-valid-base64!");
+  it("rejects an email verification secret with invalid Base64", async () => {
+    vi.stubEnv("EMAIL_VERIFICATION_SECRET_ARN", "");
+    vi.stubEnv("EMAIL_VERIFICATION_SECRET", "invalid-base64!");
 
-    const { getAuthenticationSecret } = await loadSecretsManager();
+    const { getEmailVerificationSecret } = await loadSecretsManager();
 
-    await expect(getAuthenticationSecret()).rejects.toThrow(
-      "JWT_SECRET must be Base64",
+    await expect(getEmailVerificationSecret()).rejects.toThrow(
+      "value must be Base64",
     );
   });
 
-  it("rejects an authentication secret shorter than 32 bytes", async () => {
-    vi.stubEnv("AUTHENTICATION_SECRET_ARN", "");
-    vi.stubEnv("JWT_SECRET", Buffer.from("too-short").toString("base64"));
+  it("rejects an email verification secret shorter than 32 bytes", async () => {
+    vi.stubEnv("EMAIL_VERIFICATION_SECRET_ARN", "");
+    vi.stubEnv(
+      "EMAIL_VERIFICATION_SECRET",
+      Buffer.from("too-short").toString("base64"),
+    );
 
-    const { getAuthenticationSecret } = await loadSecretsManager();
+    const { getEmailVerificationSecret } = await loadSecretsManager();
 
-    await expect(getAuthenticationSecret()).rejects.toThrow(
+    await expect(getEmailVerificationSecret()).rejects.toThrow(
       "at least 32 random bytes",
     );
   });
 
-  it("rejects malformed authentication secret JSON", async () => {
+  it("rejects a secret without EMAIL_VERIFICATION_SECRET", async () => {
     vi.stubEnv(
-      "AUTHENTICATION_SECRET_ARN",
-      "arn:aws:secretsmanager:us-east-1:123456789012:secret:test",
+      "EMAIL_VERIFICATION_SECRET_ARN",
+      "arn:aws:secretsmanager:us-east-1:123456789012:secret:email-verification",
     );
     vi.stubEnv("AWS_SESSION_TOKEN", "test-session-token");
 
-    mockSecretsExtension("{invalid-json");
+    mockSecretsExtension(JSON.stringify({ OTHER_SECRET: "value" }));
 
-    const { getAuthenticationSecret } = await loadSecretsManager();
+    const { getEmailVerificationSecret } = await loadSecretsManager();
 
-    await expect(getAuthenticationSecret()).rejects.toThrow(
-      "Authentication secret contains invalid JSON",
+    await expect(getEmailVerificationSecret()).rejects.toThrow(
+      "EMAIL_VERIFICATION_SECRET is missing",
     );
   });
 
-  it("rejects a failed Lambda extension request", async () => {
-    vi.stubEnv(
-      "AUTHENTICATION_SECRET_ARN",
-      "arn:aws:secretsmanager:us-east-1:123456789012:secret:test",
-    );
-    vi.stubEnv("AWS_SESSION_TOKEN", "test-session-token");
+  it("rejects missing email verification configuration", async () => {
+    vi.stubEnv("EMAIL_VERIFICATION_SECRET_ARN", "");
+    vi.stubEnv("EMAIL_VERIFICATION_SECRET", "");
 
-    mockSecretsExtension("", 500);
+    const { getEmailVerificationSecret } = await loadSecretsManager();
 
-    const { getAuthenticationSecret } = await loadSecretsManager();
-
-    await expect(getAuthenticationSecret()).rejects.toThrow(
-      "Secrets Manager extension returned HTTP 500",
-    );
-  });
-
-  it("rejects missing authentication configuration", async () => {
-    vi.stubEnv("AUTHENTICATION_SECRET_ARN", "");
-    vi.stubEnv("JWT_SECRET", "");
-
-    const { getAuthenticationSecret } = await loadSecretsManager();
-
-    await expect(getAuthenticationSecret()).rejects.toThrow(
-      "Neither AUTHENTICATION_SECRET_ARN nor JWT_SECRET is configured",
+    await expect(getEmailVerificationSecret()).rejects.toThrow(
+      "Neither EMAIL_VERIFICATION_SECRET_ARN nor EMAIL_VERIFICATION_SECRET is configured",
     );
   });
 });

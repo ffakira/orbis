@@ -42,6 +42,7 @@ resource "aws_iam_role_policy" "lambda_secrets_access" {
         Resource = [
           var.database_secret_arn,
           var.authentication_secret_arn
+          var.email_verification_secret_arn
         ]
       }
     ]

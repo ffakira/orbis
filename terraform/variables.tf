@@ -81,3 +81,9 @@ variable "registration_rate_limit_window_seconds" {
     error_message = "Registration rate limit window must be a positive integer."
   }
 }
+
+variable "email_verification_secret_name" {
+  description = "Secrets Manager name containing the email verification signing key"
+  type        = string
+  default     = "restaurant-cmv-api/email-verification"
+}

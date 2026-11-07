@@ -10,12 +10,19 @@ interface AuthenticationSecret {
   JWT_SECRET: Uint8Array;
 }
 
+interface EmailVerificationSecret {
+  EMAIL_VERIFICATION_SECRET: Uint8Array;
+}
+
 interface SecretsManagerResponse {
   SecretString?: string;
 }
 
 let databaseSecretPromise: Promise<DatabaseSecret> | undefined;
 let authenticationSecretPromise: Promise<AuthenticationSecret> | undefined;
+let emailVerificationSecretPromise:
+  | Promise<EmailVerificationSecret>
+  | undefined;
 
 function parseSecretString(secretString: string, secretName: string): unknown {
   try {
@@ -63,6 +70,31 @@ async function retrieveSecretString(
   return result.SecretString;
 }
 
+function decodeBase64Secret(
+  encodedSecret: string,
+  secretName: string,
+): Uint8Array {
+  if (
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(encodedSecret) ||
+    encodedSecret.length % 4 !== 0
+  ) {
+    throw new Error(`Invalid ${secretName} secret: value must be Base64`);
+  }
+
+  const decodedSecret = Buffer.from(encodedSecret, "base64");
+
+  if (
+    decodedSecret.length < 32 ||
+    decodedSecret.toString("base64") !== encodedSecret
+  ) {
+    throw new Error(
+      `Invalid ${secretName} secret: value must contain at least 32 random bytes`,
+    );
+  }
+
+  return decodedSecret;
+}
+
 function validateDatabaseSecret(value: unknown): DatabaseSecret {
   if (
     typeof value !== "object" ||
@@ -95,27 +127,32 @@ function validateAuthenticationSecret(value: unknown): AuthenticationSecret {
     throw new Error("Invalid authentication secret: JWT_SECRET is missing");
   }
 
-  const encodedSecret = value.JWT_SECRET;
+  return {
+    JWT_SECRET: decodeBase64Secret(value.JWT_SECRET, "authentication"),
+  };
+}
 
+function validateEmailVerificationSecret(
+  value: unknown,
+): EmailVerificationSecret {
   if (
-    !/^[A-Za-z0-9+/]+={0,2}$/.test(encodedSecret) ||
-    encodedSecret.length % 4 !== 0
-  ) {
-    throw new Error("Invalid authentication secret: JWT_SECRET must be Base64");
-  }
-
-  const decodedSecret = Buffer.from(encodedSecret, "base64");
-
-  if (
-    decodedSecret.length < 32 ||
-    decodedSecret.toString("base64") !== encodedSecret
+    typeof value !== "object" ||
+    value === null ||
+    !("EMAIL_VERIFICATION_SECRET" in value) ||
+    typeof value.EMAIL_VERIFICATION_SECRET !== "string" ||
+    value.EMAIL_VERIFICATION_SECRET.trim() === ""
   ) {
     throw new Error(
-      "Invalid authentication secret: JWT_SECRET must contain at least 32 random bytes",
+      "Invalid email verification secret: EMAIL_VERIFICATION_SECRET is missing",
     );
   }
 
-  return { JWT_SECRET: decodedSecret };
+  return {
+    EMAIL_VERIFICATION_SECRET: decodeBase64Secret(
+      value.EMAIL_VERIFICATION_SECRET,
+      "email verification",
+    ),
+  };
 }
 
 async function retrieveDatabaseSecret(): Promise<DatabaseSecret> {
@@ -158,6 +195,34 @@ async function retrieveAuthenticationSecret(): Promise<AuthenticationSecret> {
   );
 }
 
+async function retrieveEmailVerificationSecret(): Promise<EmailVerificationSecret> {
+  const secretArn = process.env.EMAIL_VERIFICATION_SECRET_ARN;
+
+  if (!secretArn) {
+    const emailVerificationSecret =
+      process.env.EMAIL_VERIFICATION_SECRET;
+
+    if (!emailVerificationSecret) {
+      throw new Error(
+        "Neither EMAIL_VERIFICATION_SECRET_ARN nor EMAIL_VERIFICATION_SECRET is configured",
+      );
+    }
+
+    return validateEmailVerificationSecret({
+      EMAIL_VERIFICATION_SECRET: emailVerificationSecret,
+    });
+  }
+
+  const secretString = await retrieveSecretString(
+    secretArn,
+    "Email verification",
+  );
+
+  return validateEmailVerificationSecret(
+    parseSecretString(secretString, "Email verification"),
+  );
+}
+
 export function getDatabaseSecret(): Promise<DatabaseSecret> {
   databaseSecretPromise ??= retrieveDatabaseSecret().catch((error: unknown) => {
     databaseSecretPromise = undefined;
@@ -176,4 +241,15 @@ export function getAuthenticationSecret(): Promise<AuthenticationSecret> {
   );
 
   return authenticationSecretPromise;
+}
+
+export function getEmailVerificationSecret(): Promise<EmailVerificationSecret> {
+  emailVerificationSecretPromise ??= retrieveEmailVerificationSecret().catch(
+    (error: unknown) => {
+      emailVerificationSecretPromise = undefined;
+      throw error;
+    },
+  );
+
+  return emailVerificationSecretPromise;
 }

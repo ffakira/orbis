@@ -37,3 +37,7 @@ variable "rate_limit_max_attempts" {
 variable "rate_limit_window_seconds" {
   type = number
 }
+
+variable "email_verification_secret_arn" {
+  type = string
+}

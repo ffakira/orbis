@@ -28,6 +28,8 @@ resource "aws_lambda_function" "api" {
       REGISTRATION_RATE_LIMIT_TABLE_NAME     = var.rate_limit_table_name
       REGISTRATION_RATE_LIMIT_MAX_ATTEMPTS   = tostring(var.rate_limit_max_attempts)
       REGISTRATION_RATE_LIMIT_WINDOW_SECONDS = tostring(var.rate_limit_window_seconds)
+
+      EMAIL_VERIFICATION_SECRET_ARN = var.email_verification_secret_arn
     }
   }
 }

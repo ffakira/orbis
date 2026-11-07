@@ -13,3 +13,7 @@ variable "authentication_secret_arn" {
 variable "rate_limit_table_arn" {
   type = string
 }
+
+variable "email_verification_secret_arn" {
+  type = string
+}

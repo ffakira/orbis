@@ -13,6 +13,10 @@ data "aws_secretsmanager_secret" "authentication" {
   name = var.authentication_secret_name
 }
 
+data "aws_secretsmanager_secret" "email_verification" {
+  name = var.email_verification_secret_name
+}
+
 module "rate_limiting" {
   source = "./modules/rate-limiting"
 
@@ -26,6 +30,7 @@ module "security" {
   database_secret_arn       = data.aws_secretsmanager_secret.database.arn
   authentication_secret_arn = data.aws_secretsmanager_secret.authentication.arn
   rate_limit_table_arn      = module.rate_limiting.table_arn
+  email_verification_secret_arn = data.aws_secretsmanager_secret.email_verification.arn
 }
 
 module "lambda" {
@@ -45,6 +50,8 @@ module "lambda" {
   rate_limit_table_name     = module.rate_limiting.table_name
   rate_limit_max_attempts   = var.registration_rate_limit_max_attempts
   rate_limit_window_seconds = var.registration_rate_limit_window_seconds
+
+  email_verification_secret_arn = data.aws_secretsmanager_secret.email_verification.arn
 
   depends_on = [
     module.security
