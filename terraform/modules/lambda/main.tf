@@ -49,6 +49,8 @@ resource "aws_lambda_function" "outbox" {
   memory_size = 256
   timeout     = 60
 
+  reserved_concurrent_executions = 1
+
   layers = [
     "arn:aws:lambda:us-east-1:177933569100:layer:AWS-Parameters-and-Secrets-Lambda-Extension:171"
   ]
@@ -72,4 +74,25 @@ resource "aws_lambda_function" "outbox" {
       OUTBOX_RETRY_MAX_DELAY_MS  = "900000"
     }
   }
+}
+
+resource "aws_cloudwatch_event_rule" "outbox_schedule" {
+  name                = "${var.project_name}-outbox-schedule"
+  description         = "Periodically processes pending outbox events"
+  schedule_expression = var.outbox_schedule_expression
+  state               = "ENABLED"
+}
+
+resource "aws_cloudwatch_event_target" "outbox" {
+  rule      = aws_cloudwatch_event_rule.outbox_schedule.name
+  target_id = "outbox-lambda"
+  arn       = aws_lambda_function.outbox.arn
+}
+
+resource "aws_lambda_permission" "allow_eventbridge_outbox" {
+  statement_id  = "AllowEventBridgeOutboxInvocation"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.outbox.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.outbox_schedule.arn
 }

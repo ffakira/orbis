@@ -113,3 +113,14 @@ variable "public_app_url" {
     error_message = "The public_app_url must use HTTPS."
   }
 }
+
+variable "outbox_schedule_expression" {
+  description = "EventBridge schedule expression for processing pending outbox events"
+  type        = string
+  default     = "rate(1 minute)"
+
+  validation {
+    condition     = length(trimspace(var.outbox_schedule_expression)) > 0
+    error_message = "The outbox schedule expression must not be empty."
+  }
+}

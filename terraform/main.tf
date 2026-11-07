@@ -58,6 +58,8 @@ module "lambda" {
   rate_limit_max_attempts   = var.registration_rate_limit_max_attempts
   rate_limit_window_seconds = var.registration_rate_limit_window_seconds
 
+  outbox_schedule_expression = var.outbox_schedule_expression
+
   email_verification_secret_arn = data.aws_secretsmanager_secret.email_verification.arn
   resend_secret_arn             = data.aws_secretsmanager_secret.resend.arn
 

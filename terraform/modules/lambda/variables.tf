@@ -57,3 +57,7 @@ variable "email_from_address" {
 variable "public_app_url" {
   type = string
 }
+
+variable "outbox_schedule_expression" {
+  type = string
+}
