@@ -1,5 +1,5 @@
-import type { UserStatus } from "../domain/user.js";
-import type { Email } from "../domain/value-objects/email.js";
+import type { UserStatus } from "../../domain/user.js";
+import type { Email } from "../../domain/value-objects/email.js";
 
 export interface AuthenticationUser {
   userId: string;

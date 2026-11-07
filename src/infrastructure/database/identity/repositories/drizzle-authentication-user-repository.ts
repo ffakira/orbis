@@ -7,7 +7,7 @@ import type { Email } from "../../../../modules/identity/domain/value-objects/em
 import {
   AuthenticationUser,
   AuthenticationUserRepository,
-} from "../../../../modules/identity/ports/authentication-user-repository.js";
+} from "../../../../modules/identity/application/ports/authentication-user-repository.js";
 
 type AuthenticationDatabase = Pick<Database, "select">;
 
