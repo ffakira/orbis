@@ -9,6 +9,7 @@ import * as schema from "../../../src/infrastructure/database/schema/index.js";
 import {
   users,
   termsAcceptances,
+  emailVerificationTokens,
   outboxEvents,
 } from "../../../src/infrastructure/database/schema/index.js";
 
@@ -17,6 +18,7 @@ import { DrizzleIdentityUnitOfWork } from "../../../src/modules/identity/infrast
 import { User } from "../../../src/modules/identity/domain/user.js";
 import { Email } from "../../../src/modules/identity/domain/value-objects/email.js";
 import { TermsAcceptance } from "../../../src/modules/identity/domain/terms-acceptance.js";
+import { EmailVerificationToken } from "../../../src/modules/identity/domain/email-verification-token.js";
 import { EmailAlreadyRegisteredError } from "../../../src/modules/identity/application/email-already-registered.error.js";
 
 import type { Database } from "../../../src/infrastructure/database/client.js";
@@ -63,6 +65,19 @@ function createRegistration(
   return { user, acceptance, event };
 }
 
+function createEmailVerificationToken(
+  id: string,
+  userId: string,
+): EmailVerificationToken {
+  return EmailVerificationToken.create({
+    id,
+    userId,
+    tokenHash: "a".repeat(64),
+    createdAt: new Date(registeredAt),
+    expiresAt: new Date("2026-11-08T11:00:00.000Z"),
+  });
+}
+
 async function persistRegistration(
   registration: ReturnType<typeof createRegistration>,
 ): Promise<void> {
@@ -97,12 +112,13 @@ describe("DrizzleIdentityUnitOfWork", () => {
 
   beforeEach(async () => {
     await pool.query(`
-            TRUNCATE TABLE
-                outbox_events,
-                terms_acceptances,
-                users
-            CASCADE
-        `);
+      TRUNCATE TABLE
+        outbox_events,
+        email_verification_tokens,
+        terms_acceptances,
+        users
+      CASCADE
+    `);
   });
 
   afterAll(async () => {
@@ -220,5 +236,75 @@ describe("DrizzleIdentityUnitOfWork", () => {
     expect(await db.select().from(users)).toHaveLength(1);
     expect(await db.select().from(termsAcceptances)).toHaveLength(1);
     expect(await db.select().from(outboxEvents)).toHaveLength(1);
+  });
+
+  it("persists an email verification token within the identity transaction", async () => {
+    const registration = createRegistration(
+      "00000000-0000-4000-8000-000000000051",
+      "00000000-0000-4000-8000-000000000052",
+      "00000000-0000-4000-8000-000000000053",
+      "token-persistence@example.com",
+    );
+
+    const token = createEmailVerificationToken(
+      "00000000-0000-4000-8000-000000000054",
+      registration.user.id,
+    );
+
+    await unitOfWork.transaction(async (transaction) => {
+      await transaction.users.insert(registration.user);
+      await transaction.termsAcceptances.insert(registration.acceptance);
+      await transaction.emailVerificationTokens.insert(token);
+      await transaction.outbox.append(registration.event);
+    });
+
+    const persistedTokens = await db.select().from(emailVerificationTokens);
+
+    expect(persistedTokens).toHaveLength(1);
+    expect(persistedTokens[0]?.id).toBe(token.id);
+    expect(persistedTokens[0]?.userId).toBe(registration.user.id);
+    expect(persistedTokens[0]?.tokenHash).toBe("a".repeat(64));
+    expect(persistedTokens[0]?.expiresAt).toEqual(token.expiresAt);
+    expect(persistedTokens[0]?.consumedAt).toBeNull();
+    expect(persistedTokens[0]?.revokedAt).toBeNull();
+  });
+
+  it("rolls back the email verification token when a later operation fails", async () => {
+    const registration = createRegistration(
+      "00000000-0000-4000-8000-000000000061",
+      "00000000-0000-4000-8000-000000000062",
+      "00000000-0000-4000-8000-000000000063",
+      "token-rollback@example.com",
+    );
+
+    const token = createEmailVerificationToken(
+      "00000000-0000-4000-8000-000000000064",
+      registration.user.id,
+    );
+
+    const invalidAcceptance = TermsAcceptance.record({
+      id: registration.acceptance.id,
+      userId: "00000000-0000-4000-8000-000000000099",
+      document: "terms_of_service",
+      version: "2026-11-01",
+      acceptedAt: registeredAt,
+    });
+
+    await expect(
+      unitOfWork.transaction(async (transaction) => {
+        await transaction.users.insert(registration.user);
+        await transaction.emailVerificationTokens.insert(token);
+
+        // This fails because the referenced user does not exist.
+        await transaction.termsAcceptances.insert(invalidAcceptance);
+
+        await transaction.outbox.append(registration.event);
+      }),
+    ).rejects.toThrow();
+
+    expect(await db.select().from(users)).toHaveLength(0);
+    expect(await db.select().from(emailVerificationTokens)).toHaveLength(0);
+    expect(await db.select().from(termsAcceptances)).toHaveLength(0);
+    expect(await db.select().from(outboxEvents)).toHaveLength(0);
   });
 });

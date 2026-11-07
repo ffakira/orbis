@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { env } from "../config/env.js";
+import { getEmailVerificationSecret } from "../infrastructure/secrets/secrets-manager.js";
 
 import { RegisterUserHandler } from "../modules/identity/application/commands/register-user.handler.js";
 
@@ -11,6 +12,7 @@ import type { TermsPolicy } from "../modules/identity/application/ports/terms-po
 import { getDatabase } from "../infrastructure/database/client.js";
 import { DrizzleIdentityUnitOfWork } from "../modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
 import { Argon2PasswordHasher } from "../modules/identity/infrastructure/cryptography/argon2-password-hasher.js";
+import { HmacEmailVerificationTokenSigner } from "../modules/identity/infrastructure/cryptography/hmac-email-verification-token-signer.js";
 
 class SystemClock implements Clock {
   now(): Date {
@@ -48,13 +50,19 @@ export function getRegisterUserHandler(): Promise<RegisterUserHandler> {
       throw new Error("TERMS_OF_SERVICE_VERSION is not configured.");
     }
 
-    const db = await getDatabase();
+    const [db, emailVerificationSecret] = await Promise.all([
+      getDatabase(),
+      getEmailVerificationSecret(),
+    ]);
 
     return new RegisterUserHandler({
       ids: new UuidGenerator(),
       clock: new SystemClock(),
       passwordHasher: new Argon2PasswordHasher(),
       termsPolicy: new ConfiguredTermsPolicy(termsVersion),
+      emailVerificationTokenSigner: new HmacEmailVerificationTokenSigner(
+        emailVerificationSecret.EMAIL_VERIFICATION_SECRET,
+      ),
       unitOfWork: new DrizzleIdentityUnitOfWork(db),
     });
   })().catch((error: unknown) => {
