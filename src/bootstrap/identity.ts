@@ -9,8 +9,8 @@ import type { IdGenerator } from "../modules/identity/application/ports/id-gener
 import type { TermsPolicy } from "../modules/identity/application/ports/terms-policy.js";
 
 import { getDatabase } from "../infrastructure/database/client.js";
-import { DrizzleIdentityUnitOfWork } from "../infrastructure/database/identity/drizzle-identity-unit-of-work.js";
-import { Argon2PasswordHasher } from "../infrastructure/identity/argon2-password-hasher.js";
+import { DrizzleIdentityUnitOfWork } from "../modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
+import { Argon2PasswordHasher } from "../modules/identity/infrastructure/cryptography/argon2-password-hasher.js";
 
 class SystemClock implements Clock {
   now(): Date {

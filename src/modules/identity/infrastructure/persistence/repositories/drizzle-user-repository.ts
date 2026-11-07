@@ -1,8 +1,8 @@
-import { users } from "../../schema/identity.schema.js";
-import type { DatabaseExecutor } from "../../client.js";
+import type { User } from "../../../domain/user.js";
+import { EmailAlreadyRegisteredError } from "../../../application/email-already-registered.error.js";
 
-import type { User } from "../../../../modules/identity/domain/user.js";
-import { EmailAlreadyRegisteredError } from "../../../../modules/identity/application/email-already-registered.error.js";
+import { DatabaseExecutor } from "../../../../../infrastructure/database/client.js";
+import { users } from "../../../../../infrastructure/database/schema/identity.schema.js";
 
 interface PostgreSqlError {
   code?: string;

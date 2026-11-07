@@ -8,7 +8,7 @@ import { resolve } from "node:path";
 import * as schema from "../../../src/infrastructure/database/schema/index.js";
 import { users } from "../../../src/infrastructure/database/schema/index.js";
 
-import { DrizzleAuthenticationUserRepository } from "../../../src/infrastructure/database/identity/repositories/drizzle-authentication-user-repository.js";
+import { DrizzleAuthenticationUserRepository } from "../../../src/modules/identity/infrastructure/persistence/repositories/drizzle-authentication-user-repository.js";
 
 import { Email } from "../../../src/modules/identity/domain/value-objects/email.js";
 

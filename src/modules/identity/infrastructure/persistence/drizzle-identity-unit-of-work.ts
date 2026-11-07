@@ -1,9 +1,9 @@
 import type {
   IdentityTransaction,
   IdentityUnitOfWork,
-} from "../../../modules/identity/application/ports/unit-of-work.js";
+} from "../../application/ports/unit-of-work.js";
 
-import type { Database } from "../client.js";
+import type { Database } from "../../../../infrastructure/database/client.js";
 
 import { DrizzleOutboxRepository } from "./repositories/drizzle-outbox-repository.js";
 import { DrizzleTermsAcceptanceRepository } from "./repositories/drizzle-terms-acceptance-repository.js";

@@ -12,7 +12,7 @@ import {
   outboxEvents,
 } from "../../../src/infrastructure/database/schema/index.js";
 
-import { DrizzleIdentityUnitOfWork } from "../../../src/infrastructure/database/identity/drizzle-identity-unit-of-work.js";
+import { DrizzleIdentityUnitOfWork } from "../../../src/modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
 
 import { User } from "../../../src/modules/identity/domain/user.js";
 import { Email } from "../../../src/modules/identity/domain/value-objects/email.js";

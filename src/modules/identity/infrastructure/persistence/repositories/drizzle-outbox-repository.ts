@@ -1,6 +1,6 @@
-import { outboxEvents } from "../../schema/identity.schema.js";
-import type { DatabaseExecutor } from "../../client.js";
-import { UserRegistered } from "../../../../modules/identity/domain/user-registered.event.js";
+import { DatabaseExecutor } from "../../../../../infrastructure/database/client.js";
+import { outboxEvents } from "../../../../../infrastructure/database/schema/identity.schema.js";
+import { UserRegistered } from "../../../domain/user-registered.event.js";
 
 export class DrizzleOutboxRepository {
   constructor(private readonly db: DatabaseExecutor) {}
