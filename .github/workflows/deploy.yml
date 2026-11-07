@@ -83,6 +83,31 @@ jobs:
           terraform_version: 1.17.1
           terraform_wrapper: false
 
+      - name: Inspect GitHub OIDC claims
+        shell: bash
+        run: |
+          response="$(curl -fsS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")"
+
+          token="$(jq -r '.value' <<< "$response")"
+
+          jq -R '
+            split(".")[1]
+            | gsub("-"; "+")
+            | gsub("_"; "/")
+            | @base64d
+            | fromjson
+            | {
+                sub,
+                aud,
+                repository,
+                repository_owner,
+                ref,
+                environment
+              }
+          ' <<< "$token"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
