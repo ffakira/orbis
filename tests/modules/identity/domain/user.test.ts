@@ -1,4 +1,6 @@
+
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 
 import { User } from "../../../../src/modules/identity/domain/user.js";
 import { Email } from "../../../../src/modules/identity/domain/value-objects/email.js";
@@ -66,7 +68,30 @@ describe("User", () => {
         passwordHash: "$argon2id$example-hash",
         registeredAt,
       }),
-    ).toThrow("User ID is required.");
+    ).toThrow(ZodError);
+
+    try {
+      User.register({
+        id: "",
+        eventId: "event-123",
+        firstName: "Test",
+        lastName: "User",
+        email: Email.create("test@example.com"),
+        phone: "+5511999999999",
+        passwordHash: "$argon2id$example-hash",
+        registeredAt,
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(ZodError);
+      expect((error as ZodError).issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: ["id"],
+            code: "too_small",
+          }),
+        ]),
+      );
+    }
   });
 
   it("rejects an empty password hash", () => {
@@ -81,7 +106,30 @@ describe("User", () => {
         passwordHash: "",
         registeredAt,
       }),
-    ).toThrow("Password hash is required.");
+    ).toThrow(ZodError);
+
+    try {
+      User.register({
+        id: "user-123",
+        eventId: "event-123",
+        firstName: "Test",
+        lastName: "User",
+        email: Email.create("test@example.com"),
+        phone: "+5511999999999",
+        passwordHash: "",
+        registeredAt,
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(ZodError);
+      expect((error as ZodError).issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: ["passwordHash"],
+            code: "too_small",
+          }),
+        ]),
+      );
+    }
   });
 
   it("rejects an invalid registration timestamp", () => {
@@ -96,6 +144,29 @@ describe("User", () => {
         passwordHash: "$argon2id$example-hash",
         registeredAt: "invalid-date",
       }),
-    ).toThrow("Registration timestamp must be valid.");
+    ).toThrow(ZodError);
+
+    try {
+      User.register({
+        id: "user-123",
+        eventId: "event-123",
+        firstName: "Test",
+        lastName: "User",
+        email: Email.create("test@example.com"),
+        phone: "+5511999999999",
+        passwordHash: "$argon2id$example-hash",
+        registeredAt: "invalid-date",
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(ZodError);
+      expect((error as ZodError).issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: ["registeredAt"],
+            code: "invalid_format",
+          }),
+        ]),
+      );
+    }
   });
 });

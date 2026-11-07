@@ -1,18 +1,11 @@
-import { Email } from "./value-objects/email.js";
 import { UserRegistered } from "./user-registered.event.js";
+import {
+  registerUserSchema,
+  type RegisterUserProps,
+} from "./user.schema.js";
+import { Email } from "./value-objects/email.js";
 
 export type UserStatus = "pending_email_verification" | "active" | "suspended";
-
-export interface RegisterUserProps {
-  id: string;
-  eventId: string;
-  firstName: string;
-  lastName: string;
-  email: Email;
-  phone: string;
-  passwordHash: string;
-  registeredAt: string;
-}
 
 export class User {
   private readonly domainEvents: UserRegistered[] = [];
@@ -30,40 +23,26 @@ export class User {
   ) {}
 
   static register(props: RegisterUserProps): User {
-    if (!props.id.trim()) {
-      throw new Error("User ID is required.");
-    }
-
-    if (!props.eventId.trim()) {
-      throw new Error("Event ID is required.");
-    }
-
-    if (!props.firstName.trim() || !props.lastName.trim()) {
-      throw new Error("User name is required.");
-    }
-
-    if (!props.passwordHash.trim()) {
-      throw new Error("Password hash is required.");
-    }
-
-    if (!Number.isFinite(Date.parse(props.registeredAt))) {
-      throw new Error("Registration timestamp must be valid.");
-    }
+    const validated = registerUserSchema.parse(props);
 
     const user = new User(
-      props.id,
-      props.firstName.trim(),
-      props.lastName.trim(),
-      props.email,
-      props.phone,
-      props.passwordHash,
+      validated.id,
+      validated.firstName,
+      validated.lastName,
+      validated.email,
+      validated.phone,
+      validated.passwordHash,
       "pending_email_verification",
-      props.registeredAt,
-      props.registeredAt,
+      validated.registeredAt,
+      validated.registeredAt,
     );
 
     user.domainEvents.push(
-      new UserRegistered(props.eventId, user.id, props.registeredAt),
+      new UserRegistered(
+        validated.eventId,
+        user.id,
+        validated.registeredAt,
+      ),
     );
 
     return user;

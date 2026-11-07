@@ -9,6 +9,7 @@ import {
   text,
   timestamp,
   uuid,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -71,6 +72,51 @@ export const termsAcceptances = pgTable(
       table.document,
       table.version,
     ),
+  ],
+);
+
+export const emailVerificationTokens = pgTable(
+  "email_verification_tokens",
+  {
+    id: uuid("id").primaryKey(),
+
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    // SHA-256 hash of the verification token, never the raw token.
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+
+    expiresAt: timestamp("expires_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+
+    consumedAt: timestamp("consumed_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+
+    revokedAt: timestamp("revoked_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("email_verification_tokens_user_id_idx").on(table.userId),
+
+    uniqueIndex("email_verification_tokens_one_active_per_user_idx")
+      .on(table.userId)
+      .where(
+        sql`${table.consumedAt} IS NULL AND ${table.revokedAt} IS NULL`,
+      ),
   ],
 );
 

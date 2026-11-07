@@ -1,6 +1,6 @@
 import argon2 from "argon2";
 
-import { PasswordHasher } from "../../modules/identity/application/ports/password-hasher.js";
+import type { PasswordHasher } from "../../modules/identity/application/ports/password-hasher.js";
 
 const ARGON2_OPTIONS = {
   type: argon2.argon2id as 2,
