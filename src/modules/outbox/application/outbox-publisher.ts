@@ -1,4 +1,3 @@
-
 import type { Clock } from "#modules/identity/application/ports/clock.js";
 import type { OutboxEventDispatcher } from "#modules/outbox/application/ports/outbox-event-dispatcher.js";
 import type {
