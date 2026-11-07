@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Argon2PasswordHasher } from "../../../../src/modules/identity/infrastructure/cryptography/argon2-password-hasher.js";
+import { Argon2PasswordHasher } from "#modules/identity/infrastructure/cryptography/argon2-password-hasher.js";
 
 describe("Argon2PasswordHasher", () => {
   const hasher = new Argon2PasswordHasher();

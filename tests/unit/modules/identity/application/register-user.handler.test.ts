@@ -1,10 +1,9 @@
-
 import { describe, expect, it, vi } from "vitest";
 
-import { RegisterUserHandler } from "../../../../../src/modules/identity/application/commands/register-user.handler.js";
+import { RegisterUserHandler } from "#modules/identity/application/commands/register-user.handler.js";
 
-import type { RegisterUserCommand } from "../../../../../src/modules/identity/application/commands/register-user.schema.js";
-import type { IdentityTransaction } from "../../../../../src/modules/identity/application/ports/unit-of-work.js";
+import type { RegisterUserCommand } from "#modules/identity/application/commands/register-user.schema.js";
+import type { IdentityTransaction } from "#modules/identity/application/ports/unit-of-work.js";
 
 const registeredAt = "2026-11-07T10:00:00.000Z";
 
@@ -42,6 +41,7 @@ describe("RegisterUserHandler", () => {
         insert: vi.fn(async (user) => {
           insertedUsers.push(user);
         }),
+        activate: vi.fn(async () => true),
       },
 
       authenticationUsers: {
@@ -58,6 +58,7 @@ describe("RegisterUserHandler", () => {
         insert: vi.fn(async (token) => {
           insertedTokens.push(token);
         }),
+        consume: vi.fn(async () => null),
       },
 
       outbox: {
@@ -152,12 +153,14 @@ describe("RegisterUserHandler", () => {
         typeof event === "object" &&
         event !== null &&
         "tokenId" in event,
-    ) as {
-      type: string;
-      userId: string;
-      tokenId: string;
-      expiresAt: string;
-    } | undefined;
+    ) as
+      | {
+          type: string;
+          userId: string;
+          tokenId: string;
+          expiresAt: string;
+        }
+      | undefined;
 
     expect(verificationEvent).toMatchObject({
       type: "identity.email_verification_requested.v1",

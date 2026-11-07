@@ -1,8 +1,8 @@
-import { Email } from "../../domain/value-objects/email.js";
-import { User } from "../../domain/user.js";
-import { TermsAcceptance } from "../../domain/terms-acceptance.js";
-import { EmailVerificationToken } from "../../domain/email-verification-token.js";
-import { EmailVerificationRequested } from "../../domain/email-verification-requested.event.js";
+import { Email } from "#modules/identity/domain/value-objects/email.js";
+import { User } from "#modules/identity/domain/user.js";
+import { TermsAcceptance } from "#modules/identity/domain/terms-acceptance.js";
+import { EmailVerificationToken } from "#modules/identity/domain/email-verification-token.js";
+import { EmailVerificationRequested } from "#modules/identity/domain/email-verification-requested.event.js";
 
 import type { RegisterUserCommand } from "./register-user.schema.js";
 

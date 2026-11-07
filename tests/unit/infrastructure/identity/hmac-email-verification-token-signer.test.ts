@@ -2,7 +2,7 @@ import { createHash, createHmac } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import { HmacEmailVerificationTokenSigner } from "../../../../src/modules/identity/infrastructure/cryptography/hmac-email-verification-token-signer.js";
+import { HmacEmailVerificationTokenSigner } from "#modules/identity/infrastructure/cryptography/hmac-email-verification-token-signer.js";
 
 const secret = Buffer.from(
   "synthetic-email-verification-secret-with-32-bytes-minimum",

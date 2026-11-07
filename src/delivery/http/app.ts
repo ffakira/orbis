@@ -1,20 +1,20 @@
 import express from "express";
 
-import type { RegisterUserResult } from "../../modules/identity/application/commands/register-user.handler.js";
-import type { VerifyEmailResult } from "../../modules/identity/application/commands/verify-email.handler.js";
+import type { RegisterUserResult } from "#modules/identity/application/commands/register-user.handler.js";
+import type { VerifyEmailResult } from "#modules/identity/application/commands/verify-email.handler.js";
 
 import {
   registerUserSchema,
   type RegisterUserCommand,
-} from "../../modules/identity/application/commands/register-user.schema.js";
+} from "#modules/identity/application/commands/register-user.schema.js";
 
 import {
   verifyEmailSchema,
   type VerifyEmailCommand,
-} from "../../modules/identity/application/commands/verify-email.schema.js";
+} from "#modules/identity/application/commands/verify-email.schema.js";
 
-import { EmailAlreadyRegisteredError } from "../../modules/identity/application/email-already-registered.error.js";
-import { InvalidEmailVerificationTokenError } from "../../modules/identity/application/invalid-email-verification-token.error.js";
+import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
+import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
 
 export interface RegistrationHandler {
   execute(command: RegisterUserCommand): Promise<RegisterUserResult>;

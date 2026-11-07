@@ -15,25 +15,25 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { resolve } from "node:path";
 
-import * as schema from "../../../src/infrastructure/database/schema/index.js";
+import * as schema from "#infrastructure/database/schema/index.js";
 
 import {
   users,
   termsAcceptances,
   emailVerificationTokens,
   outboxEvents,
-} from "../../../src/infrastructure/database/schema/index.js";
+} from "#infrastructure/database/schema/index.js";
 
-import { DrizzleIdentityUnitOfWork } from "../../../src/modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
+import { DrizzleIdentityUnitOfWork } from "#modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
 
-import { User } from "../../../src/modules/identity/domain/user.js";
-import { Email } from "../../../src/modules/identity/domain/value-objects/email.js";
-import { TermsAcceptance } from "../../../src/modules/identity/domain/terms-acceptance.js";
-import { EmailVerificationToken } from "../../../src/modules/identity/domain/email-verification-token.js";
+import { User } from "#modules/identity/domain/user.js";
+import { Email } from "#modules/identity/domain/value-objects/email.js";
+import { TermsAcceptance } from "#modules/identity/domain/terms-acceptance.js";
+import { EmailVerificationToken } from "#modules/identity/domain/email-verification-token.js";
 
-import { EmailAlreadyRegisteredError } from "../../../src/modules/identity/application/email-already-registered.error.js";
+import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
 
-import type { Database } from "../../../src/infrastructure/database/client.js";
+import type { Database } from "#infrastructure/database/client.js";
 
 const registeredAt = "2026-11-07T11:00:00.000Z";
 

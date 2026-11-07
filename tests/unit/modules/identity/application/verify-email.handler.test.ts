@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { VerifyEmailHandler } from "../../../../../src/modules/identity/application/commands/verify-email.handler.js";
-import { InvalidEmailVerificationTokenError } from "../../../../../src/modules/identity/application/invalid-email-verification-token.error.js";
+import { VerifyEmailHandler } from "#modules/identity/application/commands/verify-email.handler.js";
+import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
 
-import type { IdentityTransaction } from "../../../../../src/modules/identity/application/ports/unit-of-work.js";
+import type { IdentityTransaction } from "#modules/identity/application/ports/unit-of-work.js";
 
 const bearerToken = "synthetic-verification-token";
 const tokenHash = "a".repeat(64);

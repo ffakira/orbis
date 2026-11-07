@@ -6,7 +6,7 @@ const validEmailVerificationSecret = Buffer.from(
 ).toString("base64");
 
 async function loadSecretsManager() {
-  return import("../../../../src/infrastructure/secrets/secrets-manager.js");
+  return import("#infrastructure/secrets/secrets-manager.js");
 }
 
 function mockSecretsExtension(secretString: string, status = 200) {

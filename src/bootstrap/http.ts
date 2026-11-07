@@ -1,6 +1,6 @@
-import { createApp } from "../delivery/http/app.js";
+import { createApp } from "#delivery/http/app.js";
 
-import { getDatabasePool } from "../infrastructure/database/postgres.js";
+import { getDatabasePool } from "#infrastructure/database/postgres.js";
 import { getRegisterUserHandler, getVerifyEmailHandler } from "./identity.js";
 
 async function checkDatabaseReadiness() {

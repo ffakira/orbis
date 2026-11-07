@@ -37,5 +37,27 @@
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
+  },
+  "imports": {
+    "#bootstrap/*": {
+      "development": "./src/bootstrap/*",
+      "default": "./dist/bootstrap/*"
+    },
+    "#config/*": {
+      "development": "./src/config/*",
+      "default": "./dist/config/*"
+    },
+    "#delivery/*": {
+      "development": "./src/delivery/*",
+      "default": "./dist/delivery/*"
+    },
+    "#infrastructure/*": {
+      "development": "./src/infrastructure/*",
+      "default": "./dist/infrastructure/*"
+    },
+    "#modules/*": {
+      "development": "./src/modules/*",
+      "default": "./dist/modules/*"
+    }
   }
 }

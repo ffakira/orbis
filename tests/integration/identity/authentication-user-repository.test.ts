@@ -5,14 +5,14 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { resolve } from "node:path";
 
-import * as schema from "../../../src/infrastructure/database/schema/index.js";
-import { users } from "../../../src/infrastructure/database/schema/index.js";
+import * as schema from "#infrastructure/database/schema/index.js";
+import { users } from "#infrastructure/database/schema/index.js";
 
-import { DrizzleAuthenticationUserRepository } from "../../../src/modules/identity/infrastructure/persistence/repositories/drizzle-authentication-user-repository.js";
+import { DrizzleAuthenticationUserRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-authentication-user-repository.js";
 
-import { Email } from "../../../src/modules/identity/domain/value-objects/email.js";
+import { Email } from "#modules/identity/domain/value-objects/email.js";
 
-import type { Database } from "../../../src/infrastructure/database/client.js";
+import type { Database } from "#infrastructure/database/client.js";
 
 let container: Awaited<ReturnType<PostgreSqlContainer["start"]>>;
 let pool: Pool;

@@ -2,15 +2,15 @@
 import { describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
-import { createApp } from "../../../src/delivery/http/app.js";
+import { createApp } from "#delivery/http/app.js";
 
-import { EmailAlreadyRegisteredError } from "../../../src/modules/identity/application/email-already-registered.error.js";
-import { InvalidEmailVerificationTokenError } from "../../../src/modules/identity/application/invalid-email-verification-token.error.js";
+import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
+import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
 
-import type { RegisterUserResult } from "../../../src/modules/identity/application/commands/register-user.handler.js";
-import type { RegisterUserCommand } from "../../../src/modules/identity/application/commands/register-user.schema.js";
-import type { VerifyEmailResult } from "../../../src/modules/identity/application/commands/verify-email.handler.js";
-import type { VerifyEmailCommand } from "../../../src/modules/identity/application/commands/verify-email.schema.js";
+import type { RegisterUserResult } from "#modules/identity/application/commands/register-user.handler.js";
+import type { RegisterUserCommand } from "#modules/identity/application/commands/register-user.schema.js";
+import type { VerifyEmailResult } from "#modules/identity/application/commands/verify-email.handler.js";
+import type { VerifyEmailCommand } from "#modules/identity/application/commands/verify-email.schema.js";
 
 const validRegistration = {
   firstName: "Test",
