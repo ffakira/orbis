@@ -3,8 +3,6 @@ import type {
   OutboxPublisher,
 } from "#modules/outbox/application/outbox-publisher.js";
 
-import { getOutboxPublisher } from "#bootstrap/outbox.js";
-
 export interface OutboxLambdaDependencies {
   getPublisher: () => Promise<OutboxPublisher>;
 }
@@ -22,8 +20,10 @@ export function createOutboxLambdaHandler({
   };
 }
 
-const outboxLambdaHandler = createOutboxLambdaHandler({
-  getPublisher: getOutboxPublisher,
-});
+export const handler = createOutboxLambdaHandler({
+  getPublisher: async () => {
+    const { getOutboxPublisher } = await import("#bootstrap/outbox.js");
 
-export const handler = outboxLambdaHandler;
+    return getOutboxPublisher();
+  },
+});

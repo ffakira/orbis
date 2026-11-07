@@ -1,4 +1,3 @@
-
 import { z } from "zod";
 
 const outboxEnvironmentSchema = z
@@ -38,10 +37,7 @@ const outboxEnvironmentSchema = z
       });
     }
 
-    if (
-      config.nodeEnv === "production" &&
-      publicUrl.protocol !== "https:"
-    ) {
+    if (config.nodeEnv === "production" && publicUrl.protocol !== "https:") {
       context.addIssue({
         code: "custom",
         path: ["publicAppUrl"],
