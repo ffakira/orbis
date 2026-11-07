@@ -1,15 +1,16 @@
 import { randomUUID } from "node:crypto";
 
-import { env } from "../../config/env.js";
-import { RegisterUserHandler } from "../../modules/identity/application/commands/register-user.handler.js";
+import { env } from "../config/env.js";
 
-import { getDatabase } from "../database/client.js";
-import { DrizzleIdentityUnitOfWork } from "../database/identity/drizzle-identity-unit-of-work.js";
-import { Argon2PasswordHasher } from "./argon2-password-hasher.js";
+import { RegisterUserHandler } from "../modules/identity/application/commands/register-user.handler.js";
 
-import type { Clock } from "../../modules/identity/application/ports/clock.js";
-import type { IdGenerator } from "../../modules/identity/application/ports/id-generator.js";
-import type { TermsPolicy } from "../../modules/identity/application/ports/terms-policy.js";
+import type { Clock } from "../modules/identity/application/ports/clock.js";
+import type { IdGenerator } from "../modules/identity/application/ports/id-generator.js";
+import type { TermsPolicy } from "../modules/identity/application/ports/terms-policy.js";
+
+import { getDatabase } from "../infrastructure/database/client.js";
+import { DrizzleIdentityUnitOfWork } from "../infrastructure/database/identity/drizzle-identity-unit-of-work.js";
+import { Argon2PasswordHasher } from "../infrastructure/identity/argon2-password-hasher.js";
 
 class SystemClock implements Clock {
   now(): Date {

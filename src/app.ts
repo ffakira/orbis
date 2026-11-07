@@ -1,7 +1,7 @@
 import express from "express";
 
 import { getDatabasePool } from "./infrastructure/database/postgres.js";
-import { getRegisterUserHandler } from "./infrastructure/identity/registration.js";
+import { getRegisterUserHandler } from "./bootstrap/identity.js";
 
 import type { RegisterUserResult } from "./modules/identity/application/commands/register-user.handler.js";
 
