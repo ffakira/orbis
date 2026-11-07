@@ -7,7 +7,7 @@ import type {
   Context,
 } from "aws-lambda";
 
-import app from "./app.js";
+import { app } from "./bootstrap/http.js";
 import { env } from "./config/env.js";
 
 import {

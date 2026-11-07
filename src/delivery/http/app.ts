@@ -1,27 +1,29 @@
 import express from "express";
 
-import { getDatabasePool } from "./infrastructure/database/postgres.js";
-import { getRegisterUserHandler } from "./bootstrap/identity.js";
-
-import type { RegisterUserResult } from "./modules/identity/application/commands/register-user.handler.js";
+import type { RegisterUserResult } from "../../modules/identity/application/commands/register-user.handler.js";
 
 import {
   RegisterUserCommand,
   registerUserSchema,
-} from "./modules/identity/application/commands/register-user.schema.js";
-import { EmailAlreadyRegisteredError } from "./modules/identity/application/email-already-registered.error.js";
+} from "../../modules/identity/application/commands/register-user.schema.js";
+import { EmailAlreadyRegisteredError } from "../../modules/identity/application/email-already-registered.error.js";
 
-interface RegistrationHandler {
+export interface RegistrationHandler {
   execute(command: RegisterUserCommand): Promise<RegisterUserResult>;
 }
 
-interface AppDependencies {
-  getRegisterUserHandler: () => Promise<RegistrationHandler>;
+export interface DatabaseReadiness {
+  database: string;
+  username: string;
+  connectedAt: Date;
 }
 
-export function createApp(
-  dependencies: AppDependencies = { getRegisterUserHandler },
-) {
+export interface AppDependencies {
+  getRegisterUserHandler: () => Promise<RegistrationHandler>;
+  checkDatabaseReadiness: () => Promise<DatabaseReadiness>;
+}
+
+export function createApp(dependencies: AppDependencies) {
   const app = express();
 
   app.use(express.json({ limit: "16kb" }));
@@ -35,30 +37,13 @@ export function createApp(
 
   app.get("/ready", async (_req, res) => {
     try {
-      const pool = await getDatabasePool();
-
-      const result = await pool.query<{
-        database: string;
-        username: string;
-        connected_at: Date;
-      }>(`
-                SELECT
-                    current_database() AS database,
-                    current_user AS username,
-                    NOW() AS connected_at
-            `);
-
-      const database = result.rows[0];
-
-      if (!database) {
-        throw new Error("Database readiness query returned no result.");
-      }
+      const database = await dependencies.checkDatabaseReadiness();
 
       return res.status(200).json({
         status: "ok",
         database: database.database,
         username: database.username,
-        connectedAt: database.connected_at,
+        connectedAt: database.connectedAt,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
@@ -116,7 +101,3 @@ export function createApp(
 
   return app;
 }
-
-const app = createApp();
-
-export default app;

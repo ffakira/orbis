@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
-import { createApp } from "../../../src/app.js";
+import { createApp } from "../../../src/delivery/http/app.js";
 
 import { EmailAlreadyRegisteredError } from "../../../src/modules/identity/application/email-already-registered.error.js";
 
@@ -30,12 +30,22 @@ function createTestApp() {
     execute,
   }));
 
-  const app = createApp({ getRegisterUserHandler });
+  const checkDatabaseReadiness = vi.fn(async () => ({
+    database: "test_database",
+    username: "test_user",
+    connectedAt: new Date("2026-01-01T00:00:00.000Z"),
+  }));
+
+  const app = createApp({
+    getRegisterUserHandler,
+    checkDatabaseReadiness,
+  });
 
   return {
     app,
     execute,
     getRegisterUserHandler,
+    checkDatabaseReadiness,
   };
 }
 

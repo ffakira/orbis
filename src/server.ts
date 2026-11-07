@@ -1,4 +1,4 @@
-import app from "./app.js";
+import { app } from "./bootstrap/http.js";
 
 const port = Number(process.env.PORT ?? 3000);
 
