@@ -48,7 +48,6 @@ export class RegisterUserHandler {
 
     const user = User.register({
       id: ids.generate(),
-      eventId: ids.generate(),
       firstName: command.firstName,
       lastName: command.lastName,
       email: Email.create(command.email),
@@ -66,9 +65,7 @@ export class RegisterUserHandler {
     });
 
     const tokenId = ids.generate();
-    const expiresAt = new Date(
-      now.getTime() + EMAIL_VERIFICATION_TOKEN_TTL_MS,
-    );
+    const expiresAt = new Date(now.getTime() + EMAIL_VERIFICATION_TOKEN_TTL_MS);
     const expiresAtIso = expiresAt.toISOString();
 
     const tokenContext = {
@@ -77,8 +74,7 @@ export class RegisterUserHandler {
       expiresAt: expiresAtIso,
     };
 
-    const bearerToken =
-      emailVerificationTokenSigner.deriveToken(tokenContext);
+    const bearerToken = emailVerificationTokenSigner.deriveToken(tokenContext);
 
     const verificationToken = EmailVerificationToken.create({
       id: tokenId,
@@ -96,18 +92,12 @@ export class RegisterUserHandler {
       registeredAt,
     );
 
-    const domainEvents = user.pullDomainEvents();
-
     await unitOfWork.transaction(async (transaction) => {
       await transaction.users.insert(user);
 
       await transaction.termsAcceptances.insert(termsAcceptance);
 
       await transaction.emailVerificationTokens.insert(verificationToken);
-
-      for (const event of domainEvents) {
-        await transaction.outbox.append(event);
-      }
 
       await transaction.outbox.append(verificationRequestedEvent);
     });

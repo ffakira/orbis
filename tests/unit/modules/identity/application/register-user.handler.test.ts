@@ -25,7 +25,6 @@ describe("RegisterUserHandler", () => {
 
     const ids = [
       "user-123",
-      "registration-event-123",
       "acceptance-123",
       "verification-token-123",
       "verification-event-123",
@@ -115,14 +114,16 @@ describe("RegisterUserHandler", () => {
     expect(insertedUsers).toHaveLength(1);
     expect(insertedAcceptances).toHaveLength(1);
     expect(insertedTokens).toHaveLength(1);
-    expect(appendedEvents).toHaveLength(2);
+
+    // Only the email verification event is persisted.
+    expect(appendedEvents).toHaveLength(1);
 
     expect(transactionSpy).toHaveBeenCalledOnce();
 
     expect(transaction.users.insert).toHaveBeenCalledOnce();
     expect(transaction.termsAcceptances.insert).toHaveBeenCalledOnce();
     expect(transaction.emailVerificationTokens.insert).toHaveBeenCalledOnce();
-    expect(transaction.outbox.append).toHaveBeenCalledTimes(2);
+    expect(transaction.outbox.append).toHaveBeenCalledOnce();
 
     expect(deriveToken).toHaveBeenCalledWith({
       tokenId: "verification-token-123",
@@ -148,28 +149,23 @@ describe("RegisterUserHandler", () => {
       new Date("2026-11-08T10:00:00.000Z"),
     );
 
-    const verificationEvent = appendedEvents.find(
-      (event) =>
-        typeof event === "object" &&
-        event !== null &&
-        "tokenId" in event,
-    ) as
-      | {
-          type: string;
-          userId: string;
-          tokenId: string;
-          expiresAt: string;
-        }
-      | undefined;
+    const verificationEvent = appendedEvents[0] as {
+      id: string;
+      type: string;
+      userId: string;
+      tokenId: string;
+      expiresAt: string;
+    };
 
     expect(verificationEvent).toMatchObject({
+      id: "verification-event-123",
       type: "identity.email_verification_requested.v1",
       userId: "user-123",
       tokenId: "verification-token-123",
       expiresAt: "2026-11-08T10:00:00.000Z",
     });
 
-    // The raw bearer token must not be persisted or included in the event.
+    // The raw bearer token must never be persisted or included in the event.
     expect(JSON.stringify(insertedTokens)).not.toContain(
       "synthetic-bearer-token",
     );

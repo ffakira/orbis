@@ -14,6 +14,10 @@ interface EmailVerificationSecret {
   EMAIL_VERIFICATION_SECRET: Uint8Array;
 }
 
+interface ResendSecret {
+  RESEND_API_KEY: string;
+}
+
 interface SecretsManagerResponse {
   SecretString?: string;
 }
@@ -23,8 +27,12 @@ let authenticationSecretPromise: Promise<AuthenticationSecret> | undefined;
 let emailVerificationSecretPromise:
   | Promise<EmailVerificationSecret>
   | undefined;
+let resendSecretPromise: Promise<ResendSecret> | undefined;
 
-function parseSecretString(secretString: string, secretName: string): unknown {
+function parseSecretString(
+  secretString: string,
+  secretName: string,
+): unknown {
   try {
     return JSON.parse(secretString);
   } catch {
@@ -44,7 +52,9 @@ async function retrieveSecretString(
 
   const port = process.env.PARAMETERS_SECRETS_EXTENSION_HTTP_PORT ?? "2773";
 
-  const url = new URL(`http://localhost:${port}/secretsmanager/get`);
+  const url = new URL(
+    `http://localhost:${port}/secretsmanager/get`,
+  );
   url.searchParams.set("secretId", secretArn);
 
   const response = await fetch(url, {
@@ -116,7 +126,9 @@ function validateDatabaseSecret(value: unknown): DatabaseSecret {
   return { DATABASE_URL: connectionString };
 }
 
-function validateAuthenticationSecret(value: unknown): AuthenticationSecret {
+function validateAuthenticationSecret(
+  value: unknown,
+): AuthenticationSecret {
   if (
     typeof value !== "object" ||
     value === null ||
@@ -152,6 +164,22 @@ function validateEmailVerificationSecret(
       value.EMAIL_VERIFICATION_SECRET,
       "email verification",
     ),
+  };
+}
+
+function validateResendSecret(value: unknown): ResendSecret {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("RESEND_API_KEY" in value) ||
+    typeof value.RESEND_API_KEY !== "string" ||
+    value.RESEND_API_KEY.trim() === ""
+  ) {
+    throw new Error("Invalid Resend secret: RESEND_API_KEY is missing");
+  }
+
+  return {
+    RESEND_API_KEY: value.RESEND_API_KEY,
   };
 }
 
@@ -223,11 +251,35 @@ async function retrieveEmailVerificationSecret(): Promise<EmailVerificationSecre
   );
 }
 
+async function retrieveResendSecret(): Promise<ResendSecret> {
+  const secretArn = process.env.RESEND_SECRET_ARN;
+
+  if (!secretArn) {
+    const apiKey = process.env.RESEND_API_KEY;
+
+    if (!apiKey) {
+      throw new Error(
+        "Neither RESEND_SECRET_ARN nor RESEND_API_KEY is configured",
+      );
+    }
+
+    return validateResendSecret({ RESEND_API_KEY: apiKey });
+  }
+
+  const secretString = await retrieveSecretString(secretArn, "Resend");
+
+  return validateResendSecret(
+    parseSecretString(secretString, "Resend"),
+  );
+}
+
 export function getDatabaseSecret(): Promise<DatabaseSecret> {
-  databaseSecretPromise ??= retrieveDatabaseSecret().catch((error: unknown) => {
-    databaseSecretPromise = undefined;
-    throw error;
-  });
+  databaseSecretPromise ??= retrieveDatabaseSecret().catch(
+    (error: unknown) => {
+      databaseSecretPromise = undefined;
+      throw error;
+    },
+  );
 
   return databaseSecretPromise;
 }
@@ -252,4 +304,15 @@ export function getEmailVerificationSecret(): Promise<EmailVerificationSecret> {
   );
 
   return emailVerificationSecretPromise;
+}
+
+export function getResendSecret(): Promise<ResendSecret> {
+  resendSecretPromise ??= retrieveResendSecret().catch(
+    (error: unknown) => {
+      resendSecretPromise = undefined;
+      throw error;
+    },
+  );
+
+  return resendSecretPromise;
 }

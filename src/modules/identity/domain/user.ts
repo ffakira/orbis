@@ -1,15 +1,15 @@
-import { UserRegistered } from "./user-registered.event.js";
 import {
   registerUserSchema,
   type RegisterUserProps,
-} from "./user.schema.js";
-import { Email } from "./value-objects/email.js";
+} from "#modules/identity/domain/user.schema.js";
+import { Email } from "#modules/identity/domain/value-objects/email.js";
 
-export type UserStatus = "pending_email_verification" | "active" | "suspended";
+export type UserStatus =
+  | "pending_email_verification"
+  | "active"
+  | "suspended";
 
 export class User {
-  private readonly domainEvents: UserRegistered[] = [];
-
   private constructor(
     public readonly id: string,
     public readonly firstName: string,
@@ -25,7 +25,7 @@ export class User {
   static register(props: RegisterUserProps): User {
     const validated = registerUserSchema.parse(props);
 
-    const user = new User(
+    return new User(
       validated.id,
       validated.firstName,
       validated.lastName,
@@ -36,23 +36,9 @@ export class User {
       validated.registeredAt,
       validated.registeredAt,
     );
-
-    user.domainEvents.push(
-      new UserRegistered(
-        validated.eventId,
-        user.id,
-        validated.registeredAt,
-      ),
-    );
-
-    return user;
   }
 
   get passwordHash(): string {
     return this.passwordHashValue;
-  }
-
-  pullDomainEvents(): UserRegistered[] {
-    return this.domainEvents.splice(0);
   }
 }

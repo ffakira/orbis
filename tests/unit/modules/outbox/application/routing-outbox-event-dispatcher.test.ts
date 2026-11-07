@@ -1,4 +1,3 @@
-
 import { describe, expect, it, vi } from "vitest";
 
 import { RoutingOutboxEventDispatcher } from "#modules/outbox/application/routing-outbox-event-dispatcher.js";
@@ -27,9 +26,7 @@ describe("RoutingOutboxEventDispatcher", () => {
     };
 
     const dispatcher = new RoutingOutboxEventDispatcher(
-      new Map([
-        ["identity.email_verification_requested.v1", handler],
-      ]),
+      new Map([["identity.email_verification_requested.v1", handler]]),
     );
 
     await dispatcher.dispatch(event);
@@ -39,13 +36,9 @@ describe("RoutingOutboxEventDispatcher", () => {
   });
 
   it("throws when no handler is registered for the event type", async () => {
-    const dispatcher = new RoutingOutboxEventDispatcher(
-      new Map(),
-    );
+    const dispatcher = new RoutingOutboxEventDispatcher(new Map());
 
-    await expect(
-      dispatcher.dispatch(event),
-    ).rejects.toThrow(
+    await expect(dispatcher.dispatch(event)).rejects.toThrow(
       new UnsupportedOutboxEventError(event.eventType),
     );
   });
@@ -60,14 +53,10 @@ describe("RoutingOutboxEventDispatcher", () => {
     };
 
     const dispatcher = new RoutingOutboxEventDispatcher(
-      new Map([
-        ["identity.email_verification_requested.v1", handler],
-      ]),
+      new Map([["identity.email_verification_requested.v1", handler]]),
     );
 
-    await expect(
-      dispatcher.dispatch(event),
-    ).rejects.toBe(handlerError);
+    await expect(dispatcher.dispatch(event)).rejects.toBe(handlerError);
   });
 
   it("does not invoke handlers registered for another event type", async () => {
@@ -76,14 +65,12 @@ describe("RoutingOutboxEventDispatcher", () => {
     };
 
     const dispatcher = new RoutingOutboxEventDispatcher(
-      new Map([
-        ["identity.user_registered.v1", handler],
-      ]),
+      new Map([["identity.user_suspended.v1", handler]]),
     );
 
-    await expect(
-      dispatcher.dispatch(event),
-    ).rejects.toThrow(UnsupportedOutboxEventError);
+    await expect(dispatcher.dispatch(event)).rejects.toThrow(
+      UnsupportedOutboxEventError,
+    );
 
     expect(handler.handle).not.toHaveBeenCalled();
   });

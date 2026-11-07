@@ -10,7 +10,6 @@ const registeredAt = "2026-11-07T10:00:00.000Z";
 function createUser() {
   return User.register({
     id: "user-123",
-    eventId: "event-123",
     firstName: "Test",
     lastName: "User",
     email: Email.create("test@example.com"),
@@ -38,29 +37,16 @@ describe("User", () => {
     expect(user.updatedAt).toBe(registeredAt);
   });
 
-  it("does not expose password hash through domain events", () => {
+  it("exposes the password hash through its persistence accessor", () => {
     const user = createUser();
 
-    const [event] = user.pullDomainEvents();
-
-    expect(event).toBeDefined();
-    expect(event?.userId).toBe(user.id);
-    expect(event?.type).toBe("identity.user_registered.v1");
-    expect(event).not.toHaveProperty("passwordHash");
-  });
-
-  it("emits one registration event", () => {
-    const user = createUser();
-
-    expect(user.pullDomainEvents()).toHaveLength(1);
-    expect(user.pullDomainEvents()).toHaveLength(0);
+    expect(user.passwordHash).toBe("$argon2id$example-hash");
   });
 
   it("rejects an empty user ID", () => {
     expect(() =>
       User.register({
         id: "",
-        eventId: "event-123",
         firstName: "Test",
         lastName: "User",
         email: Email.create("test@example.com"),
@@ -73,7 +59,6 @@ describe("User", () => {
     try {
       User.register({
         id: "",
-        eventId: "event-123",
         firstName: "Test",
         lastName: "User",
         email: Email.create("test@example.com"),
@@ -98,7 +83,6 @@ describe("User", () => {
     expect(() =>
       User.register({
         id: "user-123",
-        eventId: "event-123",
         firstName: "Test",
         lastName: "User",
         email: Email.create("test@example.com"),
@@ -111,7 +95,6 @@ describe("User", () => {
     try {
       User.register({
         id: "user-123",
-        eventId: "event-123",
         firstName: "Test",
         lastName: "User",
         email: Email.create("test@example.com"),
@@ -136,7 +119,6 @@ describe("User", () => {
     expect(() =>
       User.register({
         id: "user-123",
-        eventId: "event-123",
         firstName: "Test",
         lastName: "User",
         email: Email.create("test@example.com"),
@@ -149,7 +131,6 @@ describe("User", () => {
     try {
       User.register({
         id: "user-123",
-        eventId: "event-123",
         firstName: "Test",
         lastName: "User",
         email: Email.create("test@example.com"),

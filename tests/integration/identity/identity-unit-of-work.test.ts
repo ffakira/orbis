@@ -1,12 +1,4 @@
-
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool } from "pg";
@@ -30,12 +22,14 @@ import { User } from "#modules/identity/domain/user.js";
 import { Email } from "#modules/identity/domain/value-objects/email.js";
 import { TermsAcceptance } from "#modules/identity/domain/terms-acceptance.js";
 import { EmailVerificationToken } from "#modules/identity/domain/email-verification-token.js";
+import { EmailVerificationRequested } from "#modules/identity/domain/email-verification-requested.event.js";
 
 import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
 
 import type { Database } from "#infrastructure/database/client.js";
 
 const registeredAt = "2026-11-07T11:00:00.000Z";
+const expiresAt = "2026-11-08T11:00:00.000Z";
 
 let container: Awaited<ReturnType<PostgreSqlContainer["start"]>>;
 let pool: Pool;
@@ -50,7 +44,6 @@ function createRegistration(
 ) {
   const user = User.register({
     id: userId,
-    eventId,
     firstName: "Test",
     lastName: "User",
     email: Email.create(email),
@@ -58,13 +51,6 @@ function createRegistration(
     passwordHash: "$argon2id$synthetic-test-hash",
     registeredAt,
   });
-
-  const events = user.pullDomainEvents();
-  const event = events[0];
-
-  if (!event) {
-    throw new Error("Expected UserRegistered domain event.");
-  }
 
   const acceptance = TermsAcceptance.record({
     id: acceptanceId,
@@ -74,20 +60,23 @@ function createRegistration(
     acceptedAt: registeredAt,
   });
 
-  return { user, acceptance, event };
-}
-
-function createEmailVerificationToken(
-  id: string,
-  userId: string,
-): EmailVerificationToken {
-  return EmailVerificationToken.create({
-    id,
+  const token = EmailVerificationToken.create({
+    id: acceptanceId,
     userId,
     tokenHash: "a".repeat(64),
     createdAt: new Date(registeredAt),
-    expiresAt: new Date("2026-11-08T11:00:00.000Z"),
+    expiresAt: new Date(expiresAt),
   });
+
+  const event = new EmailVerificationRequested(
+    eventId,
+    userId,
+    token.id,
+    expiresAt,
+    registeredAt,
+  );
+
+  return { user, acceptance, token, event };
 }
 
 async function persistRegistration(
@@ -96,6 +85,7 @@ async function persistRegistration(
   await unitOfWork.transaction(async (transaction) => {
     await transaction.users.insert(registration.user);
     await transaction.termsAcceptances.insert(registration.acceptance);
+    await transaction.emailVerificationTokens.insert(registration.token);
     await transaction.outbox.append(registration.event);
   });
 }
@@ -143,7 +133,7 @@ describe("DrizzleIdentityUnitOfWork", () => {
     }
   });
 
-  it("commits the user, terms acceptance and outbox event", async () => {
+  it("commits the user, terms acceptance, verification token and outbox event", async () => {
     const registration = createRegistration(
       "00000000-0000-4000-8000-000000000001",
       "00000000-0000-4000-8000-000000000002",
@@ -155,16 +145,20 @@ describe("DrizzleIdentityUnitOfWork", () => {
 
     const persistedUsers = await db.select().from(users);
     const persistedAcceptances = await db.select().from(termsAcceptances);
+    const persistedTokens = await db.select().from(emailVerificationTokens);
     const persistedEvents = await db.select().from(outboxEvents);
 
     expect(persistedUsers).toHaveLength(1);
     expect(persistedAcceptances).toHaveLength(1);
+    expect(persistedTokens).toHaveLength(1);
     expect(persistedEvents).toHaveLength(1);
 
     expect(persistedUsers[0]?.email).toBe("test@example.com");
     expect(persistedAcceptances[0]?.userId).toBe(registration.user.id);
+    expect(persistedTokens[0]?.userId).toBe(registration.user.id);
+
     expect(persistedEvents[0]?.eventType).toBe(
-      "identity.user_registered.v1",
+      "identity.email_verification_requested.v1",
     );
   });
 
@@ -188,16 +182,18 @@ describe("DrizzleIdentityUnitOfWork", () => {
       unitOfWork.transaction(async (transaction) => {
         await transaction.users.insert(registration.user);
         await transaction.termsAcceptances.insert(invalidAcceptance);
+        await transaction.emailVerificationTokens.insert(registration.token);
         await transaction.outbox.append(registration.event);
       }),
     ).rejects.toThrow();
 
     expect(await db.select().from(users)).toHaveLength(0);
     expect(await db.select().from(termsAcceptances)).toHaveLength(0);
+    expect(await db.select().from(emailVerificationTokens)).toHaveLength(0);
     expect(await db.select().from(outboxEvents)).toHaveLength(0);
   });
 
-  it("rolls back user and terms acceptance when outbox insertion fails", async () => {
+  it("rolls back user, terms acceptance and token when outbox insertion fails", async () => {
     const registration = createRegistration(
       "00000000-0000-4000-8000-000000000021",
       "00000000-0000-4000-8000-000000000022",
@@ -212,6 +208,8 @@ describe("DrizzleIdentityUnitOfWork", () => {
       eventType: registration.event.type,
       payload: {
         userId: registration.event.userId,
+        tokenId: registration.event.tokenId,
+        expiresAt: registration.event.expiresAt,
         occurredAt: registration.event.occurredAt,
       },
       occurredAt: new Date(registration.event.occurredAt),
@@ -221,6 +219,7 @@ describe("DrizzleIdentityUnitOfWork", () => {
 
     expect(await db.select().from(users)).toHaveLength(0);
     expect(await db.select().from(termsAcceptances)).toHaveLength(0);
+    expect(await db.select().from(emailVerificationTokens)).toHaveLength(0);
 
     // The original event remains. Only the failed transaction was rolled back.
     expect(await db.select().from(outboxEvents)).toHaveLength(1);
@@ -249,6 +248,7 @@ describe("DrizzleIdentityUnitOfWork", () => {
 
     expect(await db.select().from(users)).toHaveLength(1);
     expect(await db.select().from(termsAcceptances)).toHaveLength(1);
+    expect(await db.select().from(emailVerificationTokens)).toHaveLength(1);
     expect(await db.select().from(outboxEvents)).toHaveLength(1);
   });
 
@@ -260,25 +260,15 @@ describe("DrizzleIdentityUnitOfWork", () => {
       "token-persistence@example.com",
     );
 
-    const token = createEmailVerificationToken(
-      "00000000-0000-4000-8000-000000000054",
-      registration.user.id,
-    );
-
-    await unitOfWork.transaction(async (transaction) => {
-      await transaction.users.insert(registration.user);
-      await transaction.termsAcceptances.insert(registration.acceptance);
-      await transaction.emailVerificationTokens.insert(token);
-      await transaction.outbox.append(registration.event);
-    });
+    await persistRegistration(registration);
 
     const persistedTokens = await db.select().from(emailVerificationTokens);
 
     expect(persistedTokens).toHaveLength(1);
-    expect(persistedTokens[0]?.id).toBe(token.id);
+    expect(persistedTokens[0]?.id).toBe(registration.token.id);
     expect(persistedTokens[0]?.userId).toBe(registration.user.id);
     expect(persistedTokens[0]?.tokenHash).toBe("a".repeat(64));
-    expect(persistedTokens[0]?.expiresAt).toEqual(token.expiresAt);
+    expect(persistedTokens[0]?.expiresAt).toEqual(registration.token.expiresAt);
     expect(persistedTokens[0]?.consumedAt).toBeNull();
     expect(persistedTokens[0]?.revokedAt).toBeNull();
   });
@@ -289,11 +279,6 @@ describe("DrizzleIdentityUnitOfWork", () => {
       "00000000-0000-4000-8000-000000000062",
       "00000000-0000-4000-8000-000000000063",
       "token-rollback@example.com",
-    );
-
-    const token = createEmailVerificationToken(
-      "00000000-0000-4000-8000-000000000064",
-      registration.user.id,
     );
 
     const invalidAcceptance = TermsAcceptance.record({
@@ -307,7 +292,7 @@ describe("DrizzleIdentityUnitOfWork", () => {
     await expect(
       unitOfWork.transaction(async (transaction) => {
         await transaction.users.insert(registration.user);
-        await transaction.emailVerificationTokens.insert(token);
+        await transaction.emailVerificationTokens.insert(registration.token);
 
         // This fails because the referenced user does not exist.
         await transaction.termsAcceptances.insert(invalidAcceptance);
@@ -330,45 +315,34 @@ describe("DrizzleIdentityUnitOfWork", () => {
       "verification-success@example.com",
     );
 
-    const token = createEmailVerificationToken(
-      "00000000-0000-4000-8000-000000000074",
-      registration.user.id,
-    );
-
     const consumedAt = new Date("2026-11-07T12:00:00.000Z");
 
     await unitOfWork.transaction(async (transaction) => {
       await transaction.users.insert(registration.user);
-      await transaction.emailVerificationTokens.insert(token);
+      await transaction.emailVerificationTokens.insert(registration.token);
 
       const userId = await transaction.emailVerificationTokens.consume(
-        token.tokenHash,
+        registration.token.tokenHash,
         consumedAt,
       );
 
       expect(userId).toBe(registration.user.id);
 
-      const activated = await transaction.users.activate(
-        userId!,
-        consumedAt,
-      );
+      const activated = await transaction.users.activate(userId!, consumedAt);
 
       expect(activated).toBe(true);
 
       // A second consumption attempt must fail.
-      const replayedUserId =
-        await transaction.emailVerificationTokens.consume(
-          token.tokenHash,
-          consumedAt,
-        );
+      const replayedUserId = await transaction.emailVerificationTokens.consume(
+        registration.token.tokenHash,
+        consumedAt,
+      );
 
       expect(replayedUserId).toBeNull();
     });
 
     const [persistedUser] = await db.select().from(users);
-    const [persistedToken] = await db
-      .select()
-      .from(emailVerificationTokens);
+    const [persistedToken] = await db.select().from(emailVerificationTokens);
 
     expect(persistedUser?.status).toBe("active");
     expect(persistedUser?.updatedAt).toEqual(consumedAt);
@@ -383,16 +357,11 @@ describe("DrizzleIdentityUnitOfWork", () => {
       "verification-rollback@example.com",
     );
 
-    const token = createEmailVerificationToken(
-      "00000000-0000-4000-8000-000000000084",
-      registration.user.id,
-    );
-
     const consumedAt = new Date("2026-11-07T12:00:00.000Z");
 
     await unitOfWork.transaction(async (transaction) => {
       await transaction.users.insert(registration.user);
-      await transaction.emailVerificationTokens.insert(token);
+      await transaction.emailVerificationTokens.insert(registration.token);
     });
 
     // Simulate an account that has already been activated.
@@ -404,16 +373,13 @@ describe("DrizzleIdentityUnitOfWork", () => {
     await expect(
       unitOfWork.transaction(async (transaction) => {
         const userId = await transaction.emailVerificationTokens.consume(
-          token.tokenHash,
+          registration.token.tokenHash,
           consumedAt,
         );
 
         expect(userId).toBe(registration.user.id);
 
-        const activated = await transaction.users.activate(
-          userId!,
-          consumedAt,
-        );
+        const activated = await transaction.users.activate(userId!, consumedAt);
 
         if (!activated) {
           throw new Error("User cannot be activated.");
@@ -421,9 +387,7 @@ describe("DrizzleIdentityUnitOfWork", () => {
       }),
     ).rejects.toThrow("User cannot be activated.");
 
-    const [persistedToken] = await db
-      .select()
-      .from(emailVerificationTokens);
+    const [persistedToken] = await db.select().from(emailVerificationTokens);
 
     // The transaction rolled back, so the token remains unconsumed.
     expect(persistedToken?.consumedAt).toBeNull();

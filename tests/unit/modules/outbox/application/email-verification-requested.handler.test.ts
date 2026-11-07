@@ -211,13 +211,13 @@ describe("EmailVerificationRequestedHandler", () => {
 
     const unexpectedEvent: ClaimedOutboxEvent = {
       ...event,
-      eventType: "identity.user_registered.v1",
+      eventType: "identity.user_suspended.v1",
     };
 
     await expect(
       handler.handle(unexpectedEvent),
     ).rejects.toThrow(
-      "Unexpected outbox event type: identity.user_registered.v1",
+      "Unexpected outbox event type: identity.user_suspended.v1",
     );
 
     expect(recipients.findPendingByUserId).not.toHaveBeenCalled();

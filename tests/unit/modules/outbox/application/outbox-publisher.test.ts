@@ -22,9 +22,12 @@ const defaultConfig: OutboxPublisherConfig = {
 
 const event: ClaimedOutboxEvent = {
   id: "event-123",
-  eventType: "identity.user_registered.v1",
+  eventType: "identity.email_verification_requested.v1",
   payload: {
-    userId: "user-123",
+    userId: "550e8400-e29b-41d4-a716-446655440000",
+    tokenId: "550e8400-e29b-41d4-a716-446655440001",
+    expiresAt: "2026-11-08T12:00:00.000Z",
+    occurredAt: "2026-11-07T11:00:00.000Z",
   },
   attempts: 1,
   leaseToken: "lease-token-123",
@@ -74,10 +77,7 @@ describe("OutboxPublisher", () => {
       dispatch: vi.fn(async () => {}),
     };
 
-    const {
-      publisher,
-      clock,
-    } = createPublisher(repository, dispatcher);
+    const { publisher, clock } = createPublisher(repository, dispatcher);
 
     const result = await publisher.publishBatch();
 
@@ -117,10 +117,7 @@ describe("OutboxPublisher", () => {
 
     vi.mocked(repository.claimBatch).mockResolvedValue([]);
 
-    const {
-      publisher,
-      dispatcher,
-    } = createPublisher(repository);
+    const { publisher, dispatcher } = createPublisher(repository);
 
     const result = await publisher.publishBatch();
 
@@ -148,9 +145,7 @@ describe("OutboxPublisher", () => {
       }),
     };
 
-    const {
-      publisher,
-    } = createPublisher(repository, dispatcher);
+    const { publisher } = createPublisher(repository, dispatcher);
 
     const result = await publisher.publishBatch();
 
@@ -163,16 +158,13 @@ describe("OutboxPublisher", () => {
     });
 
     expect(repository.markPublished).not.toHaveBeenCalled();
-
     expect(repository.markFailed).toHaveBeenCalledOnce();
 
     expect(repository.markFailed).toHaveBeenCalledWith({
       eventId: event.id,
       leaseToken: event.leaseToken,
       failedAt: now,
-      nextAvailableAt: new Date(
-        now.getTime() + defaultConfig.retryBaseDelayMs,
-      ),
+      nextAvailableAt: new Date(now.getTime() + defaultConfig.retryBaseDelayMs),
       error: dispatchError.message,
       maxAttempts: defaultConfig.maxAttempts,
     });
@@ -186,9 +178,7 @@ describe("OutboxPublisher", () => {
       attempts: 3,
     };
 
-    vi.mocked(repository.claimBatch).mockResolvedValue([
-      thirdAttempt,
-    ]);
+    vi.mocked(repository.claimBatch).mockResolvedValue([thirdAttempt]);
 
     const dispatcher: OutboxEventDispatcher = {
       dispatch: vi.fn(async () => {
@@ -196,17 +186,13 @@ describe("OutboxPublisher", () => {
       }),
     };
 
-    const {
-      publisher,
-    } = createPublisher(repository, dispatcher);
+    const { publisher } = createPublisher(repository, dispatcher);
 
     await publisher.publishBatch();
 
     expect(repository.markFailed).toHaveBeenCalledWith(
       expect.objectContaining({
-        nextAvailableAt: new Date(
-          now.getTime() + 4_000,
-        ),
+        nextAvailableAt: new Date(now.getTime() + 4_000),
       }),
     );
   });
@@ -219,9 +205,7 @@ describe("OutboxPublisher", () => {
       attempts: 10,
     };
 
-    vi.mocked(repository.claimBatch).mockResolvedValue([
-      laterAttempt,
-    ]);
+    vi.mocked(repository.claimBatch).mockResolvedValue([laterAttempt]);
 
     const dispatcher: OutboxEventDispatcher = {
       dispatch: vi.fn(async () => {
@@ -229,9 +213,7 @@ describe("OutboxPublisher", () => {
       }),
     };
 
-    const {
-      publisher,
-    } = createPublisher(repository, dispatcher);
+    const { publisher } = createPublisher(repository, dispatcher);
 
     await publisher.publishBatch();
 
@@ -252,13 +234,9 @@ describe("OutboxPublisher", () => {
       attempts: defaultConfig.maxAttempts,
     };
 
-    vi.mocked(repository.claimBatch).mockResolvedValue([
-      finalAttempt,
-    ]);
+    vi.mocked(repository.claimBatch).mockResolvedValue([finalAttempt]);
 
-    vi.mocked(repository.markFailed).mockResolvedValue(
-      "dead_lettered",
-    );
+    vi.mocked(repository.markFailed).mockResolvedValue("dead_lettered");
 
     const dispatcher: OutboxEventDispatcher = {
       dispatch: vi.fn(async () => {
@@ -266,9 +244,7 @@ describe("OutboxPublisher", () => {
       }),
     };
 
-    const {
-      publisher,
-    } = createPublisher(repository, dispatcher);
+    const { publisher } = createPublisher(repository, dispatcher);
 
     const result = await publisher.publishBatch();
 
@@ -292,9 +268,7 @@ describe("OutboxPublisher", () => {
 
     vi.mocked(repository.markPublished).mockResolvedValue(false);
 
-    const {
-      publisher,
-    } = createPublisher(repository);
+    const { publisher } = createPublisher(repository);
 
     const result = await publisher.publishBatch();
 
@@ -312,9 +286,7 @@ describe("OutboxPublisher", () => {
   it("reports a lost lease when failure recording returns lease_lost", async () => {
     const repository = createRepository();
 
-    vi.mocked(repository.markFailed).mockResolvedValue(
-      "lease_lost",
-    );
+    vi.mocked(repository.markFailed).mockResolvedValue("lease_lost");
 
     const dispatcher: OutboxEventDispatcher = {
       dispatch: vi.fn(async () => {
@@ -322,9 +294,7 @@ describe("OutboxPublisher", () => {
       }),
     };
 
-    const {
-      publisher,
-    } = createPublisher(repository, dispatcher);
+    const { publisher } = createPublisher(repository, dispatcher);
 
     const result = await publisher.publishBatch();
 
@@ -340,30 +310,20 @@ describe("OutboxPublisher", () => {
   it("propagates acknowledgement errors without treating them as dispatch failures", async () => {
     const repository = createRepository();
 
-    const databaseError = new Error(
-      "Database acknowledgement failed.",
-    );
+    const databaseError = new Error("Database acknowledgement failed.");
 
-    vi.mocked(repository.markPublished).mockRejectedValue(
-      databaseError,
-    );
+    vi.mocked(repository.markPublished).mockRejectedValue(databaseError);
 
     const dispatcher: OutboxEventDispatcher = {
       dispatch: vi.fn(async () => {}),
     };
 
-    const {
-      publisher,
-    } = createPublisher(repository, dispatcher);
+    const { publisher } = createPublisher(repository, dispatcher);
 
-    await expect(
-      publisher.publishBatch(),
-    ).rejects.toBe(databaseError);
+    await expect(publisher.publishBatch()).rejects.toBe(databaseError);
 
     expect(dispatcher.dispatch).toHaveBeenCalledOnce();
-
     expect(repository.markPublished).toHaveBeenCalledOnce();
-
     expect(repository.markFailed).not.toHaveBeenCalled();
   });
 
@@ -376,12 +336,8 @@ describe("OutboxPublisher", () => {
       retryMaxDelayMs: 5_000,
     };
 
-    expect(
-      () => createPublisher(
-        repository,
-        undefined,
-        invalidConfig,
-      ),
+    expect(() =>
+      createPublisher(repository, undefined, invalidConfig),
     ).toThrow();
   });
 });
