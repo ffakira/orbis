@@ -26,10 +26,10 @@ module "rate_limiting" {
 module "security" {
   source = "./modules/security"
 
-  project_name              = var.project_name
-  database_secret_arn       = data.aws_secretsmanager_secret.database.arn
-  authentication_secret_arn = data.aws_secretsmanager_secret.authentication.arn
-  rate_limit_table_arn      = module.rate_limiting.table_arn
+  project_name                  = var.project_name
+  database_secret_arn           = data.aws_secretsmanager_secret.database.arn
+  authentication_secret_arn     = data.aws_secretsmanager_secret.authentication.arn
+  rate_limit_table_arn          = module.rate_limiting.table_arn
   email_verification_secret_arn = data.aws_secretsmanager_secret.email_verification.arn
 }
 

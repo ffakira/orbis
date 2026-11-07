@@ -13,7 +13,7 @@ The production environment uses:
 | Amazon API Gateway HTTP API | Public HTTP entry point |
 | AWS Lambda | Node.js application runtime |
 | Amazon DynamoDB | Registration rate-limit storage |
-| AWS Secrets Manager | Database and authentication secrets |
+| AWS Secrets Manager | Database, authentication and email verification secrets |
 | Parameters and Secrets Lambda Extension | Runtime secret retrieval |
 | Amazon CloudWatch Logs | Application and Lambda logs |
 | Amazon S3 | Terraform remote state |
@@ -129,7 +129,7 @@ The `.env` file must never be included in the deployment package.
 
 ## AWS Secrets Management
 
-Production credentials are stored in AWS Secrets Manager.
+Production credentials and cryptographic secrets are stored in AWS Secrets Manager.
 
 The current Terraform defaults are:
 
@@ -137,6 +137,7 @@ The current Terraform defaults are:
 |---|---|
 | Database | `restaurant-cmv-api/database` |
 | Authentication | `restaurant-cmv-api/authentication` |
+| Email verification | `restaurant-cmv-api/email-verification` |
 
 These names can be overridden through Terraform variables.
 
@@ -170,6 +171,32 @@ The application validates the encoded value and requires at least 32 bytes of de
 
 The secret is provisioned and its retrieval capability is available in the infrastructure layer. It should not be confused with an authentication endpoint or complete authentication flow.
 
+### Email Verification Secret
+
+Email verification uses a dedicated cryptographic secret, separate from the authentication secret.
+
+Its AWS Secrets Manager JSON structure must be:
+
+```json
+{
+  "EMAIL_VERIFICATION_SECRET": "<base64-encoded-random-secret>"
+}
+```
+
+Generate a suitable random value with:
+
+```bash
+openssl rand -base64 32
+```
+
+The application decodes the Base64 value and requires at least 32 bytes of cryptographically secure random data.
+
+This secret is used by the email verification token signer to derive bearer tokens using HMAC-SHA256.
+
+The application stores only the SHA-256 hash of the bearer token in the database. The raw bearer token and the cryptographic secret must never be persisted in the database or included in outbox events.
+
+Keep this secret independent from `JWT_SECRET`. Rotating one secret must not implicitly change the other.
+
 ### Runtime Secret Retrieval
 
 The Lambda function receives the secret ARNs through environment variables:
@@ -177,21 +204,28 @@ The Lambda function receives the secret ARNs through environment variables:
 ```text
 DB_SECRET_ARN
 AUTHENTICATION_SECRET_ARN
+EMAIL_VERIFICATION_SECRET_ARN
 ```
 
 The Parameters and Secrets Lambda Extension retrieves secrets through its local HTTP endpoint.
 
 The extension uses the Lambda execution environment's AWS session token for authentication.
 
-The database connection is resolved lazily when the application initialises its database pool.
+Secrets are resolved lazily by the application and cached within the Lambda execution environment.
 
-In local development, the application can use `DATABASE_URL` directly instead of a Secrets Manager ARN.
+In local development, the application can use environment variables directly instead of Secrets Manager ARNs:
+
+```dotenv
+DATABASE_URL=postgresql://<user>:<password>@<host>/<database>?sslmode=require
+JWT_SECRET=<base64-encoded-random-secret>
+EMAIL_VERIFICATION_SECRET=<base64-encoded-random-secret>
+```
 
 Never:
 
 - Commit secrets to Git.
 - Put secret values in Terraform variables or `.tfvars` files.
-- Log database connection strings.
+- Log database connection strings or cryptographic secrets.
 - Include `.env` in deployment artifacts.
 - Expose secret values through API responses.
 
@@ -235,7 +269,7 @@ The Lambda execution role is provisioned by the Terraform security module.
 Its permissions include:
 
 - Basic Lambda execution and CloudWatch logging.
-- `secretsmanager:GetSecretValue` for the configured database and authentication secrets.
+- `secretsmanager:GetSecretValue` for the configured database, authentication and email verification secrets.
 - `dynamodb:UpdateItem` for the registration rate-limit table.
 
 The role is restricted to the resources required by the Lambda function.
@@ -532,6 +566,19 @@ Check:
 The rate limiter may be unavailable or the source IP address may be missing from the API Gateway event.
 
 Inspect the Lambda logs and DynamoDB permissions.
+
+### Email Verification Secret Retrieval Fails
+
+Investigate:
+
+- Whether the email verification secret exists in AWS Secrets Manager.
+- Whether `EMAIL_VERIFICATION_SECRET_ARN` references the correct secret.
+- Whether the Lambda execution role has `secretsmanager:GetSecretValue` permission for that secret.
+- Whether the secret JSON contains the `EMAIL_VERIFICATION_SECRET` property.
+- Whether the Base64 value decodes to at least 32 bytes.
+- Whether the Parameters and Secrets Lambda Extension is available.
+
+Do not log or share the secret value while troubleshooting.
 
 ### Terraform State Lock Errors
 

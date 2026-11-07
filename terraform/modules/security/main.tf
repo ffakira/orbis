@@ -19,8 +19,7 @@ resource "aws_iam_role" "lambda_execution_role" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
-  role = aws_iam_role.lambda_execution_role.name
-
+  role       = aws_iam_role.lambda_execution_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
@@ -41,7 +40,7 @@ resource "aws_iam_role_policy" "lambda_secrets_access" {
 
         Resource = [
           var.database_secret_arn,
-          var.authentication_secret_arn
+          var.authentication_secret_arn,
           var.email_verification_secret_arn
         ]
       }
@@ -49,8 +48,8 @@ resource "aws_iam_role_policy" "lambda_secrets_access" {
   })
 }
 
-resource "aws_iam_role_policy" "lambda_registration_rate_limit_access" {
-  name = "${var.project_name}-registration-rate-limit-access"
+resource "aws_iam_role_policy" "lambda_rate_limit_access" {
+  name = "${var.project_name}-rate-limit-access"
   role = aws_iam_role.lambda_execution_role.id
 
   policy = jsonencode({
@@ -64,7 +63,9 @@ resource "aws_iam_role_policy" "lambda_registration_rate_limit_access" {
           "dynamodb:UpdateItem"
         ]
 
-        Resource = var.rate_limit_table_arn
+        Resource = [
+          var.rate_limit_table_arn
+        ]
       }
     ]
   })
