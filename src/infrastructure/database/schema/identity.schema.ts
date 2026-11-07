@@ -114,9 +114,7 @@ export const emailVerificationTokens = pgTable(
 
     uniqueIndex("email_verification_tokens_one_active_per_user_idx")
       .on(table.userId)
-      .where(
-        sql`${table.consumedAt} IS NULL AND ${table.revokedAt} IS NULL`,
-      ),
+      .where(sql`${table.consumedAt} IS NULL AND ${table.revokedAt} IS NULL`),
   ],
 );
 
@@ -155,6 +153,18 @@ export const outboxEvents = pgTable(
     })
       .notNull()
       .defaultNow(),
+
+    leaseToken: uuid("lease_token"),
+
+    leaseExpiresAt: timestamp("lease_expires_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+
+    deadLetteredAt: timestamp("dead_lettered_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
 
     publishedAt: timestamp("published_at", {
       withTimezone: true,

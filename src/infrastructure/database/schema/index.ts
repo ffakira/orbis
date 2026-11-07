@@ -1,1 +1,1 @@
-export * from "#infrastructure/database/schema/identity.schema.js";
+export * from "./identity.schema.js";
