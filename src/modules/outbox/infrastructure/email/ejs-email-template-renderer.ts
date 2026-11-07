@@ -38,12 +38,8 @@ export class EjsEmailTemplateRenderer implements EmailTemplateRenderer {
     const templates = await this.templates;
 
     return {
-      html: ejs.render(templates.html, data, {
-        strict: true,
-      }),
-      text: ejs.render(templates.text, data, {
-        strict: true,
-      }),
+      html: ejs.render(templates.html, data),
+      text: ejs.render(templates.text, data),
     };
   }
 }
