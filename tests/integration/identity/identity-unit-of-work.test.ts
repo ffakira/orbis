@@ -1,30 +1,26 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { resolve } from "node:path";
 
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
-import { Pool } from "pg";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { resolve } from "node:path";
+import { Pool } from "pg";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import * as schema from "#infrastructure/database/schema/index.js";
-
 import {
   users,
   termsAcceptances,
   emailVerificationTokens,
   outboxEvents,
 } from "#infrastructure/database/schema/index.js";
-
-import { DrizzleIdentityUnitOfWork } from "#modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
-
+import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
+import { EmailVerificationRequested } from "#modules/identity/domain/email-verification-requested.event.js";
+import { EmailVerificationToken } from "#modules/identity/domain/email-verification-token.js";
+import { TermsAcceptance } from "#modules/identity/domain/terms-acceptance.js";
 import { User } from "#modules/identity/domain/user.js";
 import { Email } from "#modules/identity/domain/value-objects/email.js";
-import { TermsAcceptance } from "#modules/identity/domain/terms-acceptance.js";
-import { EmailVerificationToken } from "#modules/identity/domain/email-verification-token.js";
-import { EmailVerificationRequested } from "#modules/identity/domain/email-verification-requested.event.js";
-
-import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
+import { DrizzleIdentityUnitOfWork } from "#modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
 
 import type { Database } from "#infrastructure/database/client.js";
 

@@ -1,4 +1,3 @@
-
 import { jwtVerify } from "jose";
 import { describe, expect, it } from "vitest";
 
@@ -32,16 +31,12 @@ describe("JoseAccessTokenIssuer", () => {
     expect(verified.payload.sub).toBe(userId);
     expect(verified.payload.iss).toBe("orbis");
     expect(verified.payload.aud).toBe("orbis-api");
-    expect(verified.payload.iat).toBe(
-      Math.floor(issuedAt.getTime() / 1000),
-    );
+    expect(verified.payload.iat).toBe(Math.floor(issuedAt.getTime() / 1000));
     expect(verified.payload.exp).toBe(
       Math.floor(issuedAt.getTime() / 1000) + 900,
     );
 
-    expect(token.expiresAt).toEqual(
-      new Date("2026-11-07T12:15:00.000Z"),
-    );
+    expect(token.expiresAt).toEqual(new Date("2026-11-07T12:15:00.000Z"));
   });
 
   it("rejects secrets shorter than 32 bytes", () => {
@@ -60,8 +55,6 @@ describe("JoseAccessTokenIssuer", () => {
       "another-synthetic-secret-with-at-least-32-bytes",
     );
 
-    await expect(
-      jwtVerify(token.value, differentSecret),
-    ).rejects.toThrow();
+    await expect(jwtVerify(token.value, differentSecret)).rejects.toThrow();
   });
 });

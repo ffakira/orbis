@@ -1,14 +1,14 @@
+import {
+  outboxPublisherConfigSchema,
+  type OutboxPublisherConfig,
+} from "#modules/outbox/application/outbox-publisher.schema.js";
+
 import type { Clock } from "#modules/identity/application/ports/clock.js";
 import type { OutboxEventDispatcher } from "#modules/outbox/application/ports/outbox-event-dispatcher.js";
 import type {
   ClaimedOutboxEvent,
   OutboxRepository,
 } from "#modules/outbox/application/ports/outbox-repository.js";
-
-import {
-  outboxPublisherConfigSchema,
-  type OutboxPublisherConfig,
-} from "#modules/outbox/application/outbox-publisher.schema.js";
 
 export interface OutboxPublisherDependencies {
   clock: Clock;
@@ -28,12 +28,8 @@ export interface OutboxPublishResult {
 export class OutboxPublisher {
   private readonly config: OutboxPublisherConfig;
 
-  constructor(
-    private readonly dependencies: OutboxPublisherDependencies,
-  ) {
-    this.config = outboxPublisherConfigSchema.parse(
-      dependencies.config,
-    );
+  constructor(private readonly dependencies: OutboxPublisherDependencies) {
+    this.config = outboxPublisherConfigSchema.parse(dependencies.config);
   }
 
   async publishBatch(): Promise<OutboxPublishResult> {

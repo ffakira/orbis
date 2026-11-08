@@ -1,10 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { APIGatewayProxyEventV2, Context } from "aws-lambda";
-
 import { createLambdaHandler } from "../../../src/lambda.js";
 
 import type { RegistrationRateLimiter } from "#infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
+import type { APIGatewayProxyEventV2, Context } from "aws-lambda";
 
 function createEvent(
   routeKey = "POST /identity/register",

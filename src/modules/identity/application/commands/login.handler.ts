@@ -1,4 +1,3 @@
-
 import { Email } from "#modules/identity/domain/value-objects/email.js";
 
 import type { LoginCommand } from "#modules/identity/application/commands/login.schema.js";
@@ -28,17 +27,11 @@ export interface LoginResult {
 }
 
 export class LoginHandler {
-  constructor(
-    private readonly dependencies: LoginHandlerDependencies,
-  ) {}
+  constructor(private readonly dependencies: LoginHandlerDependencies) {}
 
   async execute(command: LoginCommand): Promise<LoginResult> {
-    const {
-      authenticationUsers,
-      passwordHasher,
-      accessTokenIssuer,
-      clock,
-    } = this.dependencies;
+    const { authenticationUsers, passwordHasher, accessTokenIssuer, clock } =
+      this.dependencies;
 
     const email = Email.create(command.email);
     const user = await authenticationUsers.findByEmail(email);

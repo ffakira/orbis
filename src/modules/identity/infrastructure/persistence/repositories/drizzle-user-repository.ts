@@ -1,10 +1,10 @@
 import { and, eq } from "drizzle-orm";
 
-import type { User } from "#modules/identity/domain/user.js";
-import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
-
 import { DatabaseExecutor } from "#infrastructure/database/client.js";
 import { users } from "#infrastructure/database/schema/identity.schema.js";
+import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
+
+import type { User } from "#modules/identity/domain/user.js";
 
 interface PostgreSqlError {
   code?: string;

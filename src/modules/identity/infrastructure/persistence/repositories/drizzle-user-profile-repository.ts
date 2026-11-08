@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 
-import type { Database } from "#infrastructure/database/client.js";
 import { users } from "#infrastructure/database/schema/identity.schema.js";
 
+import type { Database } from "#infrastructure/database/client.js";
 import type {
   UserProfile,
   UserProfileRepository,

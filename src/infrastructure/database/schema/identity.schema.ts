@@ -1,5 +1,4 @@
 import { sql } from "drizzle-orm";
-
 import {
   index,
   integer,
@@ -116,6 +115,38 @@ export const emailVerificationTokens = pgTable(
       .on(table.userId)
       .where(sql`${table.consumedAt} IS NULL AND ${table.revokedAt} IS NULL`),
   ],
+);
+
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").primaryKey(),
+
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    // SHA-256 hash of the reset token, never the raw token.
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+
+    expiresAt: timestamp("expires_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+
+    consumedAt: timestamp("consumed_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("password_reset_tokens_user_id_idx").on(table.userId)],
 );
 
 export const outboxEvents = pgTable(

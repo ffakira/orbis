@@ -4,10 +4,7 @@ import {
 } from "#modules/identity/domain/user.schema.js";
 import { Email } from "#modules/identity/domain/value-objects/email.js";
 
-export type UserStatus =
-  | "pending_email_verification"
-  | "active"
-  | "suspended";
+export type UserStatus = "pending_email_verification" | "active" | "suspended";
 
 export class User {
   private constructor(

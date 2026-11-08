@@ -1,9 +1,7 @@
-
-import { describe, expect, it, vi } from "vitest";
 import request from "supertest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "#delivery/http/app.js";
-
 import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
 import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
 
@@ -201,9 +199,7 @@ describe("POST /identity/verify-email", () => {
   it("returns a generic error when the verification token is invalid", async () => {
     const { app, verifyExecute } = createTestApp();
 
-    verifyExecute.mockRejectedValue(
-      new InvalidEmailVerificationTokenError(),
-    );
+    verifyExecute.mockRejectedValue(new InvalidEmailVerificationTokenError());
 
     const response = await request(app)
       .post("/identity/verify-email")
@@ -217,11 +213,7 @@ describe("POST /identity/verify-email", () => {
   });
 
   it("rejects malformed tokens without invoking the handler", async () => {
-    const {
-      app,
-      verifyExecute,
-      getVerifyEmailHandler,
-    } = createTestApp();
+    const { app, verifyExecute, getVerifyEmailHandler } = createTestApp();
 
     const response = await request(app)
       .post("/identity/verify-email")
@@ -237,12 +229,10 @@ describe("POST /identity/verify-email", () => {
   it("rejects unknown request properties", async () => {
     const { app, verifyExecute } = createTestApp();
 
-    const response = await request(app)
-      .post("/identity/verify-email")
-      .send({
-        token: validToken,
-        userId,
-      });
+    const response = await request(app).post("/identity/verify-email").send({
+      token: validToken,
+      userId,
+    });
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("VALIDATION_ERROR");
@@ -252,9 +242,7 @@ describe("POST /identity/verify-email", () => {
   it("returns 500 when verification fails unexpectedly", async () => {
     const { app, verifyExecute } = createTestApp();
 
-    verifyExecute.mockRejectedValue(
-      new Error("Synthetic database failure"),
-    );
+    verifyExecute.mockRejectedValue(new Error("Synthetic database failure"));
 
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 

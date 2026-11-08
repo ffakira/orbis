@@ -1,8 +1,8 @@
 import { and, eq } from "drizzle-orm";
 
-import type { Database } from "#infrastructure/database/client.js";
 import { users } from "#infrastructure/database/schema/identity.schema.js";
 
+import type { Database } from "#infrastructure/database/client.js";
 import type {
   EmailVerificationRecipient,
   EmailVerificationRecipientRepository,
@@ -10,9 +10,7 @@ import type {
 
 type RecipientDatabase = Pick<Database, "select">;
 
-export class DrizzleEmailVerificationRecipientRepository
-  implements EmailVerificationRecipientRepository
-{
+export class DrizzleEmailVerificationRecipientRepository implements EmailVerificationRecipientRepository {
   constructor(private readonly db: RecipientDatabase) {}
 
   async findPendingByUserId(

@@ -1,19 +1,18 @@
-import serverless from "serverless-http";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import serverless from "serverless-http";
+
+import { app } from "#bootstrap/http.js";
+import { env } from "#config/env.js";
+import {
+  DynamoDbRegistrationRateLimiter,
+  type RegistrationRateLimiter,
+} from "#infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
 
 import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2,
   Context,
 } from "aws-lambda";
-
-import { app } from "#bootstrap/http.js";
-import { env } from "#config/env.js";
-
-import {
-  DynamoDbRegistrationRateLimiter,
-  type RegistrationRateLimiter,
-} from "#infrastructure/rate-limiting/dynamodb-registration-rate-limiter.js";
 
 type LambdaProxyHandler = (
   event: APIGatewayProxyEventV2,

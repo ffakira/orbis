@@ -1,6 +1,3 @@
-
-import { createApp } from "#delivery/http/app.js";
-
 import {
   getAccessTokenVerifier,
   getLoginHandler,
@@ -9,7 +6,7 @@ import {
   getVerifyEmailHandler,
   getActiveUserHandler,
 } from "#bootstrap/identity.js";
-
+import { createApp } from "#delivery/http/app.js";
 import { getDatabasePool } from "#infrastructure/database/postgres.js";
 
 async function checkDatabaseReadiness() {

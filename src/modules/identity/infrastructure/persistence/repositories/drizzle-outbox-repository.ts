@@ -1,6 +1,6 @@
-import type { DatabaseExecutor } from "#infrastructure/database/client.js";
 import { outboxEvents } from "#infrastructure/database/schema/identity.schema.js";
 
+import type { DatabaseExecutor } from "#infrastructure/database/client.js";
 import type { EmailVerificationRequested } from "#modules/identity/domain/email-verification-requested.event.js";
 
 export class DrizzleOutboxRepository {

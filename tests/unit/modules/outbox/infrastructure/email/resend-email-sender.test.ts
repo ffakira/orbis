@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
 import { Resend } from "resend";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   ResendEmailSender,

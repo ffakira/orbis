@@ -7,9 +7,7 @@ import type {
 
 const TOKEN_CONTEXT = "orbis.email-verification.v1";
 
-export class HmacEmailVerificationTokenSigner
-  implements EmailVerificationTokenSigner
-{
+export class HmacEmailVerificationTokenSigner implements EmailVerificationTokenSigner {
   private readonly secret: Buffer;
 
   constructor(secret: Uint8Array) {
@@ -36,8 +34,6 @@ export class HmacEmailVerificationTokenSigner
   }
 
   hashToken(token: string): string {
-    return createHash("sha256")
-      .update(token, "utf8")
-      .digest("hex");
+    return createHash("sha256").update(token, "utf8").digest("hex");
   }
 }

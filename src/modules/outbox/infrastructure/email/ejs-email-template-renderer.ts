@@ -1,5 +1,6 @@
-import ejs from "ejs";
 import { readFile } from "node:fs/promises";
+
+import ejs from "ejs";
 
 import type {
   EmailTemplateRenderer,

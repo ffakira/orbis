@@ -29,17 +29,13 @@ describe("EjsEmailTemplateRenderer", () => {
       verificationUrl: "https://example.test/verify?token=abc&source=email",
     });
 
-    expect(result.html).toContain(
-      "Alex &lt;Admin&gt; &amp; Associates",
-    );
+    expect(result.html).toContain("Alex &lt;Admin&gt; &amp; Associates");
 
     expect(result.html).toContain(
       'href="https://example.test/verify?token=abc&amp;source=email"',
     );
 
-    expect(result.html).not.toContain(
-      "Alex <Admin> & Associates",
-    );
+    expect(result.html).not.toContain("Alex <Admin> & Associates");
   });
 
   it("preserves plain-text content without HTML escaping", async () => {

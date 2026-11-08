@@ -3,12 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import { OutboxPublisher } from "#modules/outbox/application/outbox-publisher.js";
 
 import type { Clock } from "#modules/identity/application/ports/clock.js";
+import type { OutboxPublisherConfig } from "#modules/outbox/application/outbox-publisher.schema.js";
 import type { OutboxEventDispatcher } from "#modules/outbox/application/ports/outbox-event-dispatcher.js";
 import type {
   ClaimedOutboxEvent,
   OutboxRepository,
 } from "#modules/outbox/application/ports/outbox-repository.js";
-import type { OutboxPublisherConfig } from "#modules/outbox/application/outbox-publisher.schema.js";
 
 const now = new Date("2026-11-07T12:00:00.000Z");
 

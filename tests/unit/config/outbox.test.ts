@@ -1,11 +1,4 @@
-
-import {
-  afterEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 async function loadOutboxConfig() {
   vi.resetModules();
@@ -101,10 +94,7 @@ describe("outbox configuration", () => {
 
   it("rejects URLs containing credentials", async () => {
     stubValidEnvironment();
-    vi.stubEnv(
-      "PUBLIC_APP_URL",
-      "https://user:password@example.com",
-    );
+    vi.stubEnv("PUBLIC_APP_URL", "https://user:password@example.com");
 
     await expect(loadOutboxConfig()).rejects.toThrow(
       "PUBLIC_APP_URL must not contain credentials.",
@@ -113,10 +103,7 @@ describe("outbox configuration", () => {
 
   it("rejects URLs containing query parameters", async () => {
     stubValidEnvironment();
-    vi.stubEnv(
-      "PUBLIC_APP_URL",
-      "https://app.example.com?source=test",
-    );
+    vi.stubEnv("PUBLIC_APP_URL", "https://app.example.com?source=test");
 
     await expect(loadOutboxConfig()).rejects.toThrow(
       "PUBLIC_APP_URL must not contain a query or fragment.",
@@ -125,10 +112,7 @@ describe("outbox configuration", () => {
 
   it("rejects URLs containing fragments", async () => {
     stubValidEnvironment();
-    vi.stubEnv(
-      "PUBLIC_APP_URL",
-      "https://app.example.com#verification",
-    );
+    vi.stubEnv("PUBLIC_APP_URL", "https://app.example.com#verification");
 
     await expect(loadOutboxConfig()).rejects.toThrow(
       "PUBLIC_APP_URL must not contain a query or fragment.",

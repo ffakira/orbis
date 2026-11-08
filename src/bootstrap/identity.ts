@@ -1,34 +1,30 @@
 import { randomUUID } from "node:crypto";
 
-import { env } from "#config/env.js";
 import { createAsyncSingleton } from "#bootstrap/async-singleton.js";
-
+import { env } from "#config/env.js";
+import { getDatabase } from "#infrastructure/database/client.js";
 import {
   getAuthenticationSecret,
   getEmailVerificationSecret,
 } from "#infrastructure/secrets/secrets-manager.js";
-import { getDatabase } from "#infrastructure/database/client.js";
-
+import { SystemClock } from "#infrastructure/time/system-clock.js";
 import { LoginHandler } from "#modules/identity/application/commands/login.handler.js";
 import { RegisterUserHandler } from "#modules/identity/application/commands/register-user.handler.js";
 import { VerifyEmailHandler } from "#modules/identity/application/commands/verify-email.handler.js";
-import { GetUserProfileHandler } from "#modules/identity/application/queries/get-user-profile.handler.js";
 import { GetActiveUserHandler } from "#modules/identity/application/queries/get-active-user.handler.js";
-
-import type { Clock } from "#modules/identity/application/ports/clock.js";
-import { SystemClock } from "#infrastructure/time/system-clock.js";
-import type { IdGenerator } from "#modules/identity/application/ports/id-generator.js";
-import type { TermsPolicy } from "#modules/identity/application/ports/terms-policy.js";
-
+import { GetUserProfileHandler } from "#modules/identity/application/queries/get-user-profile.handler.js";
 import { Argon2PasswordHasher } from "#modules/identity/infrastructure/cryptography/argon2-password-hasher.js";
 import { HmacEmailVerificationTokenSigner } from "#modules/identity/infrastructure/cryptography/hmac-email-verification-token-signer.js";
 import { JoseAccessTokenIssuer } from "#modules/identity/infrastructure/cryptography/jose-access-token-issuer.js";
 import { JoseAccessTokenVerifier } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
-
+import { DrizzleIdentityUnitOfWork } from "#modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
+import { DrizzleActiveUserRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-active-user-repository.js";
 import { DrizzleAuthenticationUserRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-authentication-user-repository.js";
 import { DrizzleUserProfileRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-user-profile-repository.js";
-import { DrizzleActiveUserRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-active-user-repository.js";
-import { DrizzleIdentityUnitOfWork } from "#modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
+
+import type { Clock } from "#modules/identity/application/ports/clock.js";
+import type { IdGenerator } from "#modules/identity/application/ports/id-generator.js";
+import type { TermsPolicy } from "#modules/identity/application/ports/terms-policy.js";
 
 class UuidGenerator implements IdGenerator {
   generate(): string {
@@ -124,12 +120,10 @@ export const getUserProfileHandler = createAsyncSingleton(async () => {
   });
 });
 
-export const getActiveUserHandler = createAsyncSingleton(
-  async () => {
-    const db = await getDatabase();
+export const getActiveUserHandler = createAsyncSingleton(async () => {
+  const db = await getDatabase();
 
-    return new GetActiveUserHandler({
-      activeUsers: new DrizzleActiveUserRepository(db),
-    });
-  },
-);
+  return new GetActiveUserHandler({
+    activeUsers: new DrizzleActiveUserRepository(db),
+  });
+});

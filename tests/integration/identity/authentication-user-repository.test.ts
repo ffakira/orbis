@@ -1,16 +1,15 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { resolve } from "node:path";
+
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
-import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { resolve } from "node:path";
+import { Pool } from "pg";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import * as schema from "#infrastructure/database/schema/index.js";
 import { users } from "#infrastructure/database/schema/index.js";
-
-import { DrizzleAuthenticationUserRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-authentication-user-repository.js";
-
 import { Email } from "#modules/identity/domain/value-objects/email.js";
+import { DrizzleAuthenticationUserRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-authentication-user-repository.js";
 
 import type { Database } from "#infrastructure/database/client.js";
 

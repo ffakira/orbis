@@ -28,18 +28,12 @@ export interface MarkOutboxEventFailedInput {
 }
 
 export type MarkOutboxEventFailedResult =
-  | "retry_scheduled"
-  | "dead_lettered"
-  | "lease_lost";
+  "retry_scheduled" | "dead_lettered" | "lease_lost";
 
 export interface OutboxRepository {
-  claimBatch(
-    input: ClaimOutboxEventsInput,
-  ): Promise<ClaimedOutboxEvent[]>;
+  claimBatch(input: ClaimOutboxEventsInput): Promise<ClaimedOutboxEvent[]>;
 
-  markPublished(
-    input: MarkOutboxEventPublishedInput,
-  ): Promise<boolean>;
+  markPublished(input: MarkOutboxEventPublishedInput): Promise<boolean>;
 
   markFailed(
     input: MarkOutboxEventFailedInput,

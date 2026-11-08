@@ -4,27 +4,22 @@ import { Resend } from "resend";
 
 import { createAsyncSingleton } from "#bootstrap/async-singleton.js";
 import { outboxConfig } from "#config/outbox.js";
-
 import { getDatabase } from "#infrastructure/database/client.js";
 import {
   getEmailVerificationSecret,
   getResendSecret,
 } from "#infrastructure/secrets/secrets-manager.js";
-
-import type { Clock } from "#modules/identity/application/ports/clock.js";
 import { SystemClock } from "#infrastructure/time/system-clock.js";
-
 import { HmacEmailVerificationTokenSigner } from "#modules/identity/infrastructure/cryptography/hmac-email-verification-token-signer.js";
-
 import { EmailVerificationRequestedHandler } from "#modules/outbox/application/email-verification-requested.handler.js";
 import { OutboxPublisher } from "#modules/outbox/application/outbox-publisher.js";
 import { RoutingOutboxEventDispatcher } from "#modules/outbox/application/routing-outbox-event-dispatcher.js";
-
+import { EjsEmailTemplateRenderer } from "#modules/outbox/infrastructure/email/ejs-email-template-renderer.js";
+import { ResendEmailSender } from "#modules/outbox/infrastructure/email/resend-email-sender.js";
 import { DrizzleEmailVerificationRecipientRepository } from "#modules/outbox/infrastructure/persistence/drizzle-email-verification-recipient-repository.js";
 import { DrizzleOutboxRepository } from "#modules/outbox/infrastructure/persistence/drizzle-outbox-repository.js";
 
-import { EjsEmailTemplateRenderer } from "#modules/outbox/infrastructure/email/ejs-email-template-renderer.js";
-import { ResendEmailSender } from "#modules/outbox/infrastructure/email/resend-email-sender.js";
+import type { Clock } from "#modules/identity/application/ports/clock.js";
 
 const clock: Clock = new SystemClock();
 

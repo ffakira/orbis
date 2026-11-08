@@ -1,4 +1,3 @@
-
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -65,8 +64,7 @@ function createHandler(
   };
 
   const buildVerificationUrl = vi.fn(
-    (token: string) =>
-      `https://example.test/verify?token=${token}`,
+    (token: string) => `https://example.test/verify?token=${token}`,
   );
 
   const dependencies: EmailVerificationRequestedHandlerDependencies = {
@@ -143,9 +141,7 @@ describe("EmailVerificationRequestedHandler", () => {
       emailTemplateRenderer.renderEmailVerification,
     ).toHaveBeenCalledOnce();
 
-    expect(
-      emailTemplateRenderer.renderEmailVerification,
-    ).toHaveBeenCalledWith({
+    expect(emailTemplateRenderer.renderEmailVerification).toHaveBeenCalledWith({
       firstName: recipient.firstName,
       verificationUrl:
         "https://example.test/verify?token=synthetic-verification-token",
@@ -184,18 +180,12 @@ describe("EmailVerificationRequestedHandler", () => {
       findPendingByUserId: vi.fn(async () => null),
     };
 
-    const {
-      handler,
-      tokenSigner,
-      emailTemplateRenderer,
-      emailSender,
-    } = createHandler({ recipients });
+    const { handler, tokenSigner, emailTemplateRenderer, emailSender } =
+      createHandler({ recipients });
 
     await handler.handle(event);
 
-    expect(recipients.findPendingByUserId).toHaveBeenCalledWith(
-      payload.userId,
-    );
+    expect(recipients.findPendingByUserId).toHaveBeenCalledWith(payload.userId);
 
     expect(tokenSigner.deriveToken).not.toHaveBeenCalled();
 
@@ -214,9 +204,7 @@ describe("EmailVerificationRequestedHandler", () => {
       eventType: "identity.user_suspended.v1",
     };
 
-    await expect(
-      handler.handle(unexpectedEvent),
-    ).rejects.toThrow(
+    await expect(handler.handle(unexpectedEvent)).rejects.toThrow(
       "Unexpected outbox event type: identity.user_suspended.v1",
     );
 
@@ -235,9 +223,7 @@ describe("EmailVerificationRequestedHandler", () => {
       },
     };
 
-    await expect(
-      handler.handle(invalidEvent),
-    ).rejects.toThrow();
+    await expect(handler.handle(invalidEvent)).rejects.toThrow();
 
     expect(recipients.findPendingByUserId).not.toHaveBeenCalled();
     expect(emailSender.send).not.toHaveBeenCalled();
@@ -254,8 +240,6 @@ describe("EmailVerificationRequestedHandler", () => {
 
     const { handler } = createHandler({ emailSender });
 
-    await expect(
-      handler.handle(event),
-    ).rejects.toBe(deliveryError);
+    await expect(handler.handle(event)).rejects.toBe(deliveryError);
   });
 });

@@ -1,13 +1,12 @@
+import { emailVerificationRequestedPayloadSchema } from "#modules/outbox/application/email-verification-requested.schema.js";
+
 import type { Clock } from "#modules/identity/application/ports/clock.js";
 import type { EmailVerificationTokenSigner } from "#modules/identity/application/ports/email-verification-token-signer.js";
-
 import type { EmailSender } from "#modules/outbox/application/ports/email-sender.js";
 import type { EmailTemplateRenderer } from "#modules/outbox/application/ports/email-template-renderer.js";
 import type { EmailVerificationRecipientRepository } from "#modules/outbox/application/ports/email-verification-recipient-repository.js";
 import type { OutboxEventHandler } from "#modules/outbox/application/ports/outbox-event-handler.js";
 import type { ClaimedOutboxEvent } from "#modules/outbox/application/ports/outbox-repository.js";
-
-import { emailVerificationRequestedPayloadSchema } from "#modules/outbox/application/email-verification-requested.schema.js";
 
 const EMAIL_VERIFICATION_EVENT_TYPE =
   "identity.email_verification_requested.v1";

@@ -1,12 +1,11 @@
-import type { RequestHandler } from "express";
+import { InactiveUserError } from "#modules/identity/application/queries/get-active-user.handler.js";
+import { InvalidAccessTokenError } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
 
 import type {
   AccessTokenVerifier,
   VerifiedAccessToken,
 } from "#modules/identity/application/ports/access-token-verifier.js";
-
-import { InactiveUserError } from "#modules/identity/application/queries/get-active-user.handler.js";
-import { InvalidAccessTokenError } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
+import type { RequestHandler } from "express";
 
 export interface AuthenticationMiddlewareDependencies {
   getAccessTokenVerifier: () => Promise<AccessTokenVerifier>;

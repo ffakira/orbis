@@ -1,10 +1,10 @@
-
-import { and, asc, eq, isNull, lte, or, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 
-import type { Database } from "#infrastructure/database/client.js";
+import { and, asc, eq, isNull, lte, or, sql } from "drizzle-orm";
+
 import { outboxEvents } from "#infrastructure/database/schema/identity.schema.js";
 
+import type { Database } from "#infrastructure/database/client.js";
 import type {
   ClaimOutboxEventsInput,
   ClaimedOutboxEvent,
@@ -24,10 +24,7 @@ export class DrizzleOutboxRepository implements OutboxRepository {
       throw new RangeError("Claim limit must be a positive integer.");
     }
 
-    if (
-      !Number.isFinite(input.leaseDurationMs) ||
-      input.leaseDurationMs <= 0
-    ) {
+    if (!Number.isFinite(input.leaseDurationMs) || input.leaseDurationMs <= 0) {
       throw new RangeError("Lease duration must be greater than zero.");
     }
 
@@ -46,10 +43,7 @@ export class DrizzleOutboxRepository implements OutboxRepository {
             ),
           ),
         )
-        .orderBy(
-          asc(outboxEvents.availableAt),
-          asc(outboxEvents.createdAt),
-        )
+        .orderBy(asc(outboxEvents.availableAt), asc(outboxEvents.createdAt))
         .limit(input.limit)
         .for("update", { skipLocked: true });
 
@@ -90,9 +84,7 @@ export class DrizzleOutboxRepository implements OutboxRepository {
     });
   }
 
-  async markPublished(
-    input: MarkOutboxEventPublishedInput,
-  ): Promise<boolean> {
+  async markPublished(input: MarkOutboxEventPublishedInput): Promise<boolean> {
     const [publishedEvent] = await this.db
       .update(outboxEvents)
       .set({

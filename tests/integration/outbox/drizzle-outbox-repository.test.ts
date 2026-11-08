@@ -1,16 +1,16 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { resolve } from "node:path";
 
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
-import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { resolve } from "node:path";
+import { Pool } from "pg";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import * as schema from "#infrastructure/database/schema/index.js";
 import { outboxEvents } from "#infrastructure/database/schema/index.js";
-import type { Database } from "#infrastructure/database/client.js";
-
 import { DrizzleOutboxRepository } from "#modules/outbox/infrastructure/persistence/drizzle-outbox-repository.js";
+
+import type { Database } from "#infrastructure/database/client.js";
 
 const now = new Date("2026-11-07T15:00:00.000Z");
 

@@ -1,13 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
 import request from "supertest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "#delivery/http/app.js";
-
 import { InvalidCredentialsError } from "#modules/identity/application/commands/login.handler.js";
 import { InvalidAccessTokenError } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
 
-import type { LoginCommand } from "#modules/identity/application/commands/login.schema.js";
 import type { LoginResult } from "#modules/identity/application/commands/login.handler.js";
+import type { LoginCommand } from "#modules/identity/application/commands/login.schema.js";
 import type { UserProfile } from "#modules/identity/application/ports/user-profile-repository.js";
 
 const validLogin: LoginCommand = {

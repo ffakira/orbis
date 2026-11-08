@@ -1,17 +1,15 @@
-
 import express, { type ErrorRequestHandler } from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
 import { createRequireAuthentication } from "#delivery/http/middleware/require-authentication.js";
+import { InactiveUserError } from "#modules/identity/application/queries/get-active-user.handler.js";
+import { InvalidAccessTokenError } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
 
 import type {
   AccessTokenVerifier,
   VerifiedAccessToken,
 } from "#modules/identity/application/ports/access-token-verifier.js";
-
-import { InactiveUserError } from "#modules/identity/application/queries/get-active-user.handler.js";
-import { InvalidAccessTokenError } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
 
 const authenticatedUser: VerifiedAccessToken = {
   userId: "00000000-0000-4000-8000-000000000001",
@@ -88,8 +86,9 @@ describe("require authentication middleware", () => {
   it("accepts a valid Bearer token and exposes authenticated claims", async () => {
     const verify = vi.fn().mockResolvedValue(authenticatedUser);
 
-    const { app, executeActiveUser, getActiveUserHandler } =
-      createApp({ verify });
+    const { app, executeActiveUser, getActiveUserHandler } = createApp({
+      verify,
+    });
 
     const response = await request(app)
       .get("/protected")
@@ -107,9 +106,7 @@ describe("require authentication middleware", () => {
 
     expect(getActiveUserHandler).toHaveBeenCalledOnce();
     expect(executeActiveUser).toHaveBeenCalledOnce();
-    expect(executeActiveUser).toHaveBeenCalledWith(
-      authenticatedUser.userId,
-    );
+    expect(executeActiveUser).toHaveBeenCalledWith(authenticatedUser.userId);
   });
 
   it("rejects inactive users", async () => {
@@ -132,9 +129,7 @@ describe("require authentication middleware", () => {
     });
 
     expect(verify).toHaveBeenCalledOnce();
-    expect(executeActiveUser).toHaveBeenCalledWith(
-      authenticatedUser.userId,
-    );
+    expect(executeActiveUser).toHaveBeenCalledWith(authenticatedUser.userId);
   });
 
   it("rejects invalid access tokens", async () => {
@@ -192,8 +187,6 @@ describe("require authentication middleware", () => {
       error: "INTERNAL_SERVER_ERROR",
     });
 
-    expect(executeActiveUser).toHaveBeenCalledWith(
-      authenticatedUser.userId,
-    );
+    expect(executeActiveUser).toHaveBeenCalledWith(authenticatedUser.userId);
   });
 });

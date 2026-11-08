@@ -1,11 +1,7 @@
-import express from "express";
+import express, { type Response } from "express";
 
-import type { LoginResult } from "#modules/identity/application/commands/login.handler.js";
-import type { RegisterUserResult } from "#modules/identity/application/commands/register-user.handler.js";
-import type { VerifyEmailResult } from "#modules/identity/application/commands/verify-email.handler.js";
-import type { UserProfile } from "#modules/identity/application/ports/user-profile-repository.js";
-import type { AccessTokenVerifier } from "#modules/identity/application/ports/access-token-verifier.js";
-
+import { createRequireAuthentication } from "#delivery/http/middleware/require-authentication.js";
+import { InvalidCredentialsError } from "#modules/identity/application/commands/login.handler.js";
 import {
   loginSchema,
   type LoginCommand,
@@ -18,13 +14,15 @@ import {
   verifyEmailSchema,
   type VerifyEmailCommand,
 } from "#modules/identity/application/commands/verify-email.schema.js";
-
-import { InvalidCredentialsError } from "#modules/identity/application/commands/login.handler.js";
-import { UserProfileNotFoundError } from "#modules/identity/application/queries/get-user-profile.handler.js";
 import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
 import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
+import { UserProfileNotFoundError } from "#modules/identity/application/queries/get-user-profile.handler.js";
 
-import { createRequireAuthentication } from "#delivery/http/middleware/require-authentication.js";
+import type { LoginResult } from "#modules/identity/application/commands/login.handler.js";
+import type { RegisterUserResult } from "#modules/identity/application/commands/register-user.handler.js";
+import type { VerifyEmailResult } from "#modules/identity/application/commands/verify-email.handler.js";
+import type { AccessTokenVerifier } from "#modules/identity/application/ports/access-token-verifier.js";
+import type { UserProfile } from "#modules/identity/application/ports/user-profile-repository.js";
 
 export interface LoginHandlerContract {
   execute(command: LoginCommand): Promise<LoginResult>;
@@ -63,34 +61,38 @@ export function createIdentityRouter(dependencies: IdentityHttpDependencies) {
     getActiveUserHandler: dependencies.getActiveUserHandler,
   });
 
-  router.get("/me", requireAuthentication, async (_req, res) => {
-    try {
-      const userId = res.locals.auth.userId;
-      const handler = await dependencies.getUserProfileHandler();
-      const profile = await handler.execute(userId);
+  router.get(
+    "/me",
+    requireAuthentication,
+    async (_req, res: Response<unknown, { auth: { userId: string } }>) => {
+      try {
+        const userId = res.locals.auth.userId;
+        const handler = await dependencies.getUserProfileHandler();
+        const profile = await handler.execute(userId);
 
-      return res.status(200).json({
-        user: profile,
-      });
-    } catch (error) {
-      if (error instanceof UserProfileNotFoundError) {
-        return res.status(401).json({
-          error: "UNAUTHENTICATED",
-          message: "The authenticated user is no longer available.",
+        return res.status(200).json({
+          user: profile,
+        });
+      } catch (error) {
+        if (error instanceof UserProfileNotFoundError) {
+          return res.status(401).json({
+            error: "UNAUTHENTICATED",
+            message: "The authenticated user is no longer available.",
+          });
+        }
+
+        console.error(
+          "Retrieving authenticated user profile failed:",
+          error instanceof Error ? error.name : "UnknownError",
+        );
+
+        return res.status(500).json({
+          error: "INTERNAL_SERVER_ERROR",
+          message: "An unexpected error occurred.",
         });
       }
-
-      console.error(
-        "Retrieving authenticated user profile failed:",
-        error instanceof Error ? error.name : "UnknownError",
-      );
-
-      return res.status(500).json({
-        error: "INTERNAL_SERVER_ERROR",
-        message: "An unexpected error occurred.",
-      });
-    }
-  });
+    },
+  );
 
   router.post("/login", async (req, res) => {
     const validation = loginSchema.safeParse(req.body);

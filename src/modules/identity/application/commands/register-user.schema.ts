@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { emailSchema } from "#modules/identity/domain/value-objects/email.schema.js";
 
 const phoneSchema = z.string().regex(/^\+[1-9]\d{7,14}$/, {

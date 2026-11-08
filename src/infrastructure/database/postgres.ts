@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+
 import { getDatabaseSecret } from "#infrastructure/secrets/secrets-manager.js";
 
 let poolPromise: Promise<Pool> | undefined;

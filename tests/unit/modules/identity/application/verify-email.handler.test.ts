@@ -76,12 +76,8 @@ describe("VerifyEmailHandler", () => {
   it("consumes the token and activates the user transactionally", async () => {
     const transaction = createTransaction();
 
-    const {
-      handler,
-      hashToken,
-      clockNow,
-      transactionSpy,
-    } = createHandler(transaction);
+    const { handler, hashToken, clockNow, transactionSpy } =
+      createHandler(transaction);
 
     const result = await handler.execute({
       token: bearerToken,
@@ -98,33 +94,26 @@ describe("VerifyEmailHandler", () => {
 
     expect(transactionSpy).toHaveBeenCalledOnce();
 
-    expect(
-      transaction.emailVerificationTokens.consume,
-    ).toHaveBeenCalledOnce();
+    expect(transaction.emailVerificationTokens.consume).toHaveBeenCalledOnce();
 
-    expect(
-      transaction.emailVerificationTokens.consume,
-    ).toHaveBeenCalledWith(tokenHash, consumedAt);
+    expect(transaction.emailVerificationTokens.consume).toHaveBeenCalledWith(
+      tokenHash,
+      consumedAt,
+    );
 
     expect(transaction.users.activate).toHaveBeenCalledOnce();
 
-    expect(transaction.users.activate).toHaveBeenCalledWith(
-      userId,
-      consumedAt,
-    );
+    expect(transaction.users.activate).toHaveBeenCalledWith(userId, consumedAt);
   });
 
   it("rejects an invalid, expired, revoked, or consumed token", async () => {
     const transaction = createTransaction();
 
-    vi.mocked(
-      transaction.emailVerificationTokens.consume,
-    ).mockResolvedValue(null);
+    vi.mocked(transaction.emailVerificationTokens.consume).mockResolvedValue(
+      null,
+    );
 
-    const {
-      handler,
-      transactionSpy,
-    } = createHandler(transaction);
+    const { handler, transactionSpy } = createHandler(transaction);
 
     await expect(
       handler.execute({
@@ -134,9 +123,10 @@ describe("VerifyEmailHandler", () => {
 
     expect(transactionSpy).toHaveBeenCalledOnce();
 
-    expect(
-      transaction.emailVerificationTokens.consume,
-    ).toHaveBeenCalledWith(tokenHash, consumedAt);
+    expect(transaction.emailVerificationTokens.consume).toHaveBeenCalledWith(
+      tokenHash,
+      consumedAt,
+    );
 
     expect(transaction.users.activate).not.toHaveBeenCalled();
   });
@@ -144,14 +134,9 @@ describe("VerifyEmailHandler", () => {
   it("rejects verification when the user cannot be activated", async () => {
     const transaction = createTransaction();
 
-    vi.mocked(
-      transaction.users.activate,
-    ).mockResolvedValue(false);
+    vi.mocked(transaction.users.activate).mockResolvedValue(false);
 
-    const {
-      handler,
-      transactionSpy,
-    } = createHandler(transaction);
+    const { handler, transactionSpy } = createHandler(transaction);
 
     await expect(
       handler.execute({
@@ -161,13 +146,12 @@ describe("VerifyEmailHandler", () => {
 
     expect(transactionSpy).toHaveBeenCalledOnce();
 
-    expect(
-      transaction.emailVerificationTokens.consume,
-    ).toHaveBeenCalledWith(tokenHash, consumedAt);
+    expect(transaction.emailVerificationTokens.consume).toHaveBeenCalledWith(
+      tokenHash,
+      consumedAt,
+    );
 
-    expect(
-      transaction.users.activate,
-    ).toHaveBeenCalledWith(userId, consumedAt);
+    expect(transaction.users.activate).toHaveBeenCalledWith(userId, consumedAt);
   });
 
   it("does not return success when the transaction fails", async () => {
