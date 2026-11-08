@@ -8,6 +8,7 @@ import {
   getRequestPasswordRecoveryHandler,
   getConfirmPasswordRecoveryHandler,
 } from "#bootstrap/identity.js";
+import { getCreateRestaurantHandler } from "#bootstrap/restaurants.js";
 import { createApp } from "#delivery/http/app.js";
 import { getDatabasePool } from "#infrastructure/database/postgres.js";
 
@@ -47,6 +48,11 @@ export const app = createApp({
     getConfirmPasswordRecoveryHandler,
     getAccessTokenVerifier,
     getUserProfileHandler,
+    getActiveUserHandler,
+  },
+  restaurants: {
+    getCreateRestaurantHandler,
+    getAccessTokenVerifier,
     getActiveUserHandler,
   },
   checkDatabaseReadiness,

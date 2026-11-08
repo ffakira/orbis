@@ -4,6 +4,10 @@ import {
   createIdentityRouter,
   type IdentityHttpDependencies,
 } from "#delivery/http/identity.http.js";
+import {
+  createRestaurantsRouter,
+  type RestaurantsHttpDependencies,
+} from "#delivery/http/restaurants.http.js";
 
 export interface DatabaseReadiness {
   database: string;
@@ -13,6 +17,7 @@ export interface DatabaseReadiness {
 
 export interface AppDependencies {
   identity: IdentityHttpDependencies;
+  restaurants?: RestaurantsHttpDependencies;
   checkDatabaseReadiness: () => Promise<DatabaseReadiness>;
 }
 
@@ -54,6 +59,10 @@ export function createApp(dependencies: AppDependencies) {
   });
 
   app.use("/identity", createIdentityRouter(dependencies.identity));
+
+  if (dependencies.restaurants) {
+    app.use("/restaurants", createRestaurantsRouter(dependencies.restaurants));
+  }
 
   return app;
 }
