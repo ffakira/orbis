@@ -10,11 +10,13 @@ import {
 import { SystemClock } from "#infrastructure/time/system-clock.js";
 import { LoginHandler } from "#modules/identity/application/commands/login.handler.js";
 import { RegisterUserHandler } from "#modules/identity/application/commands/register-user.handler.js";
+import { RequestPasswordRecoveryHandler } from "#modules/identity/application/commands/request-password-recovery.handler.js";
 import { VerifyEmailHandler } from "#modules/identity/application/commands/verify-email.handler.js";
 import { GetActiveUserHandler } from "#modules/identity/application/queries/get-active-user.handler.js";
 import { GetUserProfileHandler } from "#modules/identity/application/queries/get-user-profile.handler.js";
 import { Argon2PasswordHasher } from "#modules/identity/infrastructure/cryptography/argon2-password-hasher.js";
 import { HmacEmailVerificationTokenSigner } from "#modules/identity/infrastructure/cryptography/hmac-email-verification-token-signer.js";
+import { HmacPasswordResetTokenSigner } from "#modules/identity/infrastructure/cryptography/hmac-password-reset-token-signer.js";
 import { JoseAccessTokenIssuer } from "#modules/identity/infrastructure/cryptography/jose-access-token-issuer.js";
 import { JoseAccessTokenVerifier } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
 import { DrizzleIdentityUnitOfWork } from "#modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
@@ -58,6 +60,10 @@ const getIdentityDependencies = createAsyncSingleton(async () => {
   return {
     unitOfWork: new DrizzleIdentityUnitOfWork(db),
     emailVerificationTokenSigner: new HmacEmailVerificationTokenSigner(
+      emailVerificationSecret.EMAIL_VERIFICATION_SECRET,
+    ),
+    /** @todo: Introduce a dedicated PASSWORD_RESET_SECRET and Secrets Manager entry.*/
+    passwordResetTokenSigner: new HmacPasswordResetTokenSigner(
       emailVerificationSecret.EMAIL_VERIFICATION_SECRET,
     ),
   };
@@ -127,3 +133,15 @@ export const getActiveUserHandler = createAsyncSingleton(async () => {
     activeUsers: new DrizzleActiveUserRepository(db),
   });
 });
+
+export const getRequestPasswordRecoveryHandler = createAsyncSingleton(
+  async () => {
+    const dependencies = await getIdentityDependencies();
+
+    return new RequestPasswordRecoveryHandler({
+      ids,
+      clock,
+      ...dependencies,
+    });
+  },
+);

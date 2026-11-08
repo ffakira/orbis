@@ -5,6 +5,7 @@ import {
   getUserProfileHandler,
   getVerifyEmailHandler,
   getActiveUserHandler,
+  getRequestPasswordRecoveryHandler,
 } from "#bootstrap/identity.js";
 import { createApp } from "#delivery/http/app.js";
 import { getDatabasePool } from "#infrastructure/database/postgres.js";
@@ -41,6 +42,7 @@ export const app = createApp({
     getLoginHandler,
     getRegisterUserHandler,
     getVerifyEmailHandler,
+    getRequestPasswordRecoveryHandler,
     getAccessTokenVerifier,
     getUserProfileHandler,
     getActiveUserHandler,

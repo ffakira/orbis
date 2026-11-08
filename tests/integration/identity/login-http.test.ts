@@ -81,6 +81,12 @@ function createTestApp() {
     execute: profileExecute,
   }));
 
+  const getRequestPasswordRecoveryHandler = vi.fn(async () => ({
+    execute: vi.fn(async () => ({
+      requested: true as const,
+    })),
+  }));
+
   const checkDatabaseReadiness = vi.fn(async () => ({
     database: "test_database",
     username: "test_user",
@@ -95,6 +101,7 @@ function createTestApp() {
       getAccessTokenVerifier,
       getUserProfileHandler,
       getActiveUserHandler,
+      getRequestPasswordRecoveryHandler,
     },
     checkDatabaseReadiness,
   });

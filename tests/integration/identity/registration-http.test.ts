@@ -70,6 +70,11 @@ function createTestApp() {
       getActiveUserHandler: vi.fn(async () => ({
         execute: async () => {},
       })),
+      getRequestPasswordRecoveryHandler: vi.fn(async () => ({
+        execute: vi.fn(async () => ({
+          requested: true as const,
+        })),
+      })),
     },
     checkDatabaseReadiness,
   });

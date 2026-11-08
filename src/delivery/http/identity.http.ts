@@ -10,6 +10,11 @@ import {
   registerUserSchema,
   type RegisterUserCommand,
 } from "#modules/identity/application/commands/register-user.schema.js";
+import { RequestPasswordRecoveryResult } from "#modules/identity/application/commands/request-password-recovery.handler.js";
+import {
+  RequestPasswordRecoveryCommand,
+  requestPasswordRecoverySchema,
+} from "#modules/identity/application/commands/request-password-recovery.schema.js";
 import {
   verifyEmailSchema,
   type VerifyEmailCommand,
@@ -44,6 +49,12 @@ export interface ActiveUserHandlerContract {
   execute(userId: string): Promise<void>;
 }
 
+export interface RequestPasswordRecoveryHandlerContract {
+  execute(
+    command: RequestPasswordRecoveryCommand,
+  ): Promise<RequestPasswordRecoveryResult>;
+}
+
 export interface IdentityHttpDependencies {
   getLoginHandler: () => Promise<LoginHandlerContract>;
   getRegisterUserHandler: () => Promise<RegistrationHandler>;
@@ -51,6 +62,7 @@ export interface IdentityHttpDependencies {
   getAccessTokenVerifier: () => Promise<AccessTokenVerifier>;
   getUserProfileHandler: () => Promise<UserProfileHandlerContract>;
   getActiveUserHandler: () => Promise<ActiveUserHandlerContract>;
+  getRequestPasswordRecoveryHandler: () => Promise<RequestPasswordRecoveryHandlerContract>;
 }
 
 export function createIdentityRouter(dependencies: IdentityHttpDependencies) {
@@ -201,6 +213,38 @@ export function createIdentityRouter(dependencies: IdentityHttpDependencies) {
 
       console.error(
         "Email verification failed:",
+        error instanceof Error ? error.name : "UnknownError",
+      );
+
+      return res.status(500).json({
+        error: "INTERNAL_SERVER_ERROR",
+        message: "An unexpected error occurred.",
+      });
+    }
+  });
+
+  router.post("/password-recovery", async (req, res) => {
+    const validation = requestPasswordRecoverySchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({
+        error: "VALIDATION_ERROR",
+        message: "The password recovery data is invalid.",
+        issues: validation.error.issues.map((issue) => ({
+          path: issue.path,
+          message: issue.message,
+        })),
+      });
+    }
+
+    try {
+      const handler = await dependencies.getRequestPasswordRecoveryHandler();
+      const result = await handler.execute(validation.data);
+
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error(
+        "Password recovery request failed:",
         error instanceof Error ? error.name : "UnknownError",
       );
 
