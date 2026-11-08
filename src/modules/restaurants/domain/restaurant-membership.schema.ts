@@ -1,8 +1,18 @@
 import { z } from "zod";
 
-export const restaurantRoleSchema = z.enum(["owner", "manager", "staff"]);
+import {
+  restaurantRoleSchema,
+  type RestaurantRole,
+} from "#modules/restaurants/domain/restaurant-role.js";
+
+export { restaurantRoleSchema };
+export type { RestaurantRole };
 
 export const restaurantMembershipStatusSchema = z.enum(["active", "suspended"]);
+
+export type RestaurantMembershipStatus = z.infer<
+  typeof restaurantMembershipStatusSchema
+>;
 
 export const restaurantMembershipSchema = z.object({
   id: z.string().trim().min(1),
@@ -14,10 +24,6 @@ export const restaurantMembershipSchema = z.object({
   updatedAt: z.iso.datetime({ offset: true }),
 });
 
-export type RestaurantRole = z.infer<typeof restaurantRoleSchema>;
-export type RestaurantMembershipStatus = z.infer<
-  typeof restaurantMembershipStatusSchema
->;
 export type CreateRestaurantMembershipProps = z.infer<
   typeof restaurantMembershipSchema
 >;
