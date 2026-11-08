@@ -1,20 +1,29 @@
 import express from "express";
 
+import type { LoginResult } from "#modules/identity/application/commands/login.handler.js";
 import type { RegisterUserResult } from "#modules/identity/application/commands/register-user.handler.js";
 import type { VerifyEmailResult } from "#modules/identity/application/commands/verify-email.handler.js";
 
 import {
+  loginSchema,
+  type LoginCommand,
+} from "#modules/identity/application/commands/login.schema.js";
+import {
   registerUserSchema,
   type RegisterUserCommand,
 } from "#modules/identity/application/commands/register-user.schema.js";
-
 import {
   verifyEmailSchema,
   type VerifyEmailCommand,
 } from "#modules/identity/application/commands/verify-email.schema.js";
 
+import { InvalidCredentialsError } from "#modules/identity/application/commands/login.handler.js";
 import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
 import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
+
+export interface LoginHandlerContract {
+  execute(command: LoginCommand): Promise<LoginResult>;
+}
 
 export interface RegistrationHandler {
   execute(command: RegisterUserCommand): Promise<RegisterUserResult>;
@@ -31,6 +40,7 @@ export interface DatabaseReadiness {
 }
 
 export interface AppDependencies {
+  getLoginHandler: () => Promise<LoginHandlerContract>;
   getRegisterUserHandler: () => Promise<RegistrationHandler>;
   getVerifyEmailHandler: () => Promise<EmailVerificationHandler>;
   checkDatabaseReadiness: () => Promise<DatabaseReadiness>;
@@ -69,6 +79,45 @@ export function createApp(dependencies: AppDependencies) {
         status: "error",
         message: "Database is unavailable",
         timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  app.post("/identity/login", async (req, res) => {
+    const validation = loginSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({
+        error: "VALIDATION_ERROR",
+        message: "The login data is invalid.",
+        issues: validation.error.issues.map((issue) => ({
+          path: issue.path,
+          message: issue.message,
+        })),
+      });
+    }
+
+    try {
+      const handler = await dependencies.getLoginHandler();
+      const result = await handler.execute(validation.data);
+
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof InvalidCredentialsError) {
+        return res.status(401).json({
+          error: "INVALID_CREDENTIALS",
+          message: "Email or password is incorrect.",
+        });
+      }
+
+      console.error(
+        "User login failed:",
+        error instanceof Error ? error.name : "UnknownError",
+      );
+
+      return res.status(500).json({
+        error: "INTERNAL_SERVER_ERROR",
+        message: "An unexpected error occurred.",
       });
     }
   });

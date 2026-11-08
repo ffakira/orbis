@@ -30,3 +30,7 @@ terraform/*.tfvars
 
 # Coverage
 coverage/
+
+# IDEs and editors
+.vscode/
+.idea/

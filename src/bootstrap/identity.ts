@@ -1,9 +1,13 @@
 import { randomUUID } from "node:crypto";
 
 import { env } from "#config/env.js";
-import { getEmailVerificationSecret } from "#infrastructure/secrets/secrets-manager.js";
+import {
+  getAuthenticationSecret,
+  getEmailVerificationSecret,
+} from "#infrastructure/secrets/secrets-manager.js";
 import { getDatabase } from "#infrastructure/database/client.js";
 
+import { LoginHandler } from "#modules/identity/application/commands/login.handler.js";
 import { RegisterUserHandler } from "#modules/identity/application/commands/register-user.handler.js";
 import { VerifyEmailHandler } from "#modules/identity/application/commands/verify-email.handler.js";
 
@@ -11,9 +15,11 @@ import type { Clock } from "#modules/identity/application/ports/clock.js";
 import type { IdGenerator } from "#modules/identity/application/ports/id-generator.js";
 import type { TermsPolicy } from "#modules/identity/application/ports/terms-policy.js";
 
-import { DrizzleIdentityUnitOfWork } from "#modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
 import { Argon2PasswordHasher } from "#modules/identity/infrastructure/cryptography/argon2-password-hasher.js";
 import { HmacEmailVerificationTokenSigner } from "#modules/identity/infrastructure/cryptography/hmac-email-verification-token-signer.js";
+import { JoseAccessTokenIssuer } from "#modules/identity/infrastructure/cryptography/jose-access-token-issuer.js";
+import { DrizzleAuthenticationUserRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-authentication-user-repository.js";
+import { DrizzleIdentityUnitOfWork } from "#modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
 
 class SystemClock implements Clock {
   now(): Date {
@@ -114,4 +120,29 @@ export function getVerifyEmailHandler(): Promise<VerifyEmailHandler> {
   });
 
   return verifyEmailHandlerPromise;
+}
+
+let loginHandlerPromise: Promise<LoginHandler> | undefined;
+
+export function getLoginHandler(): Promise<LoginHandler> {
+  loginHandlerPromise ??= (async () => {
+    const [db, authenticationSecret] = await Promise.all([
+      getDatabase(),
+      getAuthenticationSecret(),
+    ]);
+
+    return new LoginHandler({
+      authenticationUsers: new DrizzleAuthenticationUserRepository(db),
+      passwordHasher: new Argon2PasswordHasher(),
+      accessTokenIssuer: new JoseAccessTokenIssuer(
+        authenticationSecret.JWT_SECRET,
+      ),
+      clock,
+    });
+  })().catch((error: unknown) => {
+    loginHandlerPromise = undefined;
+    throw error;
+  });
+
+  return loginHandlerPromise;
 }
