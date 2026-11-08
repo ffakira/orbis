@@ -1,238 +1,198 @@
-# Architecture
+# Arquitetura
 
-Orbis API follows **Hexagonal Architecture (Ports and Adapters)**, organised around business capabilities.
+A API Orbis segue **Arquitetura Hexagonal (Ports and Adapters)** e é organizada em torno de capacidades de negócio.
 
-The architecture separates business rules from delivery mechanisms, frameworks and infrastructure implementations. Application use cases depend on ports, while infrastructure adapters implement those ports.
+A arquitetura separa as regras de negócio dos mecanismos de entrega, frameworks e implementações de infraestrutura. Os casos de uso dependem de portas definidas pela aplicação, enquanto adaptadores concretos implementam essas portas.
 
-## Architectural Boundaries
+## Fronteiras arquiteturais
 
-The application has five main architectural responsibilities.
-
-| Boundary | Responsibility |
+| Camada ou fronteira | Responsabilidade |
 |---|---|
-| Bootstrap | Composition roots and dependency wiring |
-| Delivery | HTTP and other external entry points |
-| Domain | Business entities, value objects, invariants and domain events |
-| Application | Use cases, commands and application ports |
-| Infrastructure | Persistence, database connectivity, cryptography and external integrations |
+| Bootstrap | Composição de dependências e inicialização |
+| Delivery | Entrada de requisições HTTP e outros mecanismos externos |
+| Domain | Entidades, objetos de valor, invariantes e eventos de domínio |
+| Application | Casos de uso, comandos, consultas e portas |
+| Infrastructure | Persistência, banco de dados, criptografia e integrações externas |
 
 ### Bootstrap
 
-The bootstrap layer composes the application.
+A camada de bootstrap conecta as implementações concretas às dependências exigidas pelos casos de uso.
 
-It instantiates application handlers, infrastructure adapters and their dependencies. It is the place where concrete implementations are connected to application ports.
+Ela instancia handlers, adaptadores de infraestrutura e suas dependências. É o ponto de composição da aplicação.
 
-Current composition roots:
+Composições atuais incluem:
 
 - `src/bootstrap/http.ts`
 - `src/bootstrap/identity.ts`
+- `src/bootstrap/outbox.ts`
 
-`http.ts` creates the Express application and supplies its dependencies.
+`http.ts` cria a aplicação Express e fornece suas dependências HTTP.
 
-`identity.ts` creates and caches the registration handler and its dependencies.
+`identity.ts` compõe os handlers e adaptadores do módulo Identity.
+
+`outbox.ts` compõe o publisher, o dispatcher, os handlers de eventos, os repositórios e os serviços de envio de e-mail.
 
 ### Delivery
 
-The delivery layer handles incoming requests and translates them into application operations.
+A camada de entrega recebe requisições externas, valida os dados de entrada e encaminha a operação para o caso de uso correspondente.
 
-Current HTTP implementation:
+A implementação HTTP está em:
 
 ```text
 src/delivery/http/
-└── app.ts
+├── app.ts
+├── identity.http.ts
+└── middleware/
 ```
 
-The Express application is created through `createApp()`, which receives its dependencies explicitly.
-
-This allows HTTP behaviour to be tested independently from the production database and infrastructure.
+A aplicação Express é criada por `createApp()`, que recebe suas dependências explicitamente. Isso permite testar o comportamento HTTP sem inicializar os adaptadores reais de produção.
 
 ### Domain
 
-The domain layer contains business concepts and rules.
+O domínio contém os conceitos e as regras centrais de cada capacidade de negócio.
 
-It does not depend on Express, Drizzle ORM, PostgreSQL or AWS.
+Ele não deve depender de Express, Drizzle ORM, PostgreSQL, AWS ou serviços externos.
 
-The Identity domain currently includes:
+O domínio Identity inclui conceitos como:
 
 - `User`
-- `TermsAcceptance`
-- `UserRegistered`
 - `Email`
+- `TermsAcceptance`
+- `EmailVerificationToken`
+- `EmailVerificationRequested`
 
-The `User` entity starts with the `pending_email_verification` status when registered.
+O estado inicial de uma conta recém-cadastrada é `pending_email_verification`. A conta passa a `active` após a verificação de e-mail concluída com sucesso.
 
 ### Application
 
-The application layer implements use cases and defines the ports required by those use cases.
+A camada de aplicação implementa os casos de uso e define as portas necessárias para executá-los.
 
-The registration use case is implemented by `RegisterUserHandler`.
+Exemplos de casos de uso do Identity:
 
-Its dependencies are expressed through interfaces:
+- `RegisterUserHandler`
+- `LoginHandler`
+- `VerifyEmailHandler`
+- `GetUserProfileHandler`
+- `GetActiveUserHandler`
 
-- `IdGenerator`
-- `Clock`
-- `PasswordHasher`
-- `TermsPolicy`
-- `IdentityUnitOfWork`
+As dependências são expressas por interfaces, como `Clock`, `IdGenerator`, `PasswordHasher`, `TermsPolicy`, `IdentityUnitOfWork`, `AccessTokenIssuer` e `AccessTokenVerifier`.
 
-The handler does not instantiate infrastructure implementations.
+Os handlers não devem instanciar diretamente implementações de infraestrutura.
 
 ### Infrastructure
 
-Infrastructure contains concrete implementations of application ports and shared technical capabilities.
+A infraestrutura contém implementações concretas das portas da aplicação e recursos técnicos compartilhados.
 
-Identity-specific adapters are owned by the Identity module.
+Adaptadores específicos de cada módulo pertencem ao próprio módulo. Recursos compartilhados, como conexão com banco, esquema de banco, carregamento de segredos e integração com serviços de nuvem, ficam em `src/infrastructure/`.
 
-Shared database connectivity, database schemas, secrets retrieval and rate-limiting integrations remain under `src/infrastructure/`.
-
-## System Architecture
+## Visão geral do sistema
 
 ```mermaid
 flowchart TB
-    Client["HTTP Client"]
+    Client["Cliente HTTP"]
 
     subgraph Delivery["Delivery"]
         Express["Express 5"]
-        HTTP["HTTP Adapter"]
+        HTTP["Adaptadores HTTP"]
     end
 
     subgraph Bootstrap["Bootstrap"]
-        Composition["Dependency Composition"]
+        Composition["Composição de dependências"]
     end
 
-    subgraph Identity["Identity Module"]
-        Handler["RegisterUserHandler"]
-
-        subgraph Application["Application"]
-            UseCase["Registration Use Case"]
-            Ports["Application Ports"]
-        end
-
-        subgraph Domain["Domain"]
-            User["User"]
-            Email["Email"]
-            Terms["TermsAcceptance"]
-            Event["UserRegistered"]
-        end
-
-        subgraph ModuleInfrastructure["Identity Infrastructure"]
-            Hasher["Argon2PasswordHasher"]
-            UoW["DrizzleIdentityUnitOfWork"]
-            Repositories["Identity Repositories"]
-        end
+    subgraph Modules["Módulos de negócio"]
+        Identity["Identity"]
+        Outbox["Outbox"]
     end
 
-    subgraph SharedInfrastructure["Shared Infrastructure"]
+    subgraph Shared["Infraestrutura compartilhada"]
         Database["PostgreSQL / Drizzle"]
-        Secrets["Secrets Retrieval"]
-        RateLimit["DynamoDB Rate Limiter"]
+        Secrets["AWS Secrets Manager"]
+        RateLimit["DynamoDB"]
     end
 
     Client --> Express
     Express --> HTTP
-    HTTP --> Handler
-    Composition -.-> Handler
-    Composition -.-> Hasher
-    Composition -.-> UoW
-
-    Handler --> UseCase
-    UseCase --> User
-    UseCase --> Email
-    UseCase --> Terms
-    UseCase --> Event
-    UseCase --> Ports
-
-    Hasher -.-> Ports
-    UoW -.-> Ports
-    UoW --> Repositories
-    Repositories --> Database
-    Database --> Secrets
-    RateLimit -.-> Client
+    HTTP --> Identity
+    Composition -.-> Identity
+    Composition -.-> Outbox
+    Identity --> Database
+    Outbox --> Database
+    Outbox --> Secrets
+    RateLimit -.-> Express
 ```
 
-The diagram shows logical responsibilities and dependencies. The Lambda rate limiter executes before the Express application receives registration requests.
+O diagrama representa responsabilidades lógicas. A limitação de requisições de cadastro é aplicada no adaptador da Lambda antes de a requisição chegar à aplicação Express.
 
-## Dependency Direction
+## Direção das dependências
 
-The architecture follows these dependency rules:
+A arquitetura segue estas regras:
 
-1. Domain does not depend on Application, Delivery or Infrastructure.
-2. Application depends on Domain and its own ports.
-3. Infrastructure implements ports defined by Application.
-4. Delivery translates external requests into application commands.
-5. Bootstrap connects concrete implementations to application dependencies.
+1. O domínio não depende das camadas Application, Delivery ou Infrastructure.
+2. A aplicação depende do domínio e das próprias portas.
+3. A infraestrutura implementa portas definidas pela aplicação.
+4. A camada Delivery traduz requisições externas em operações da aplicação.
+5. O Bootstrap conecta implementações concretas às dependências dos casos de uso.
+6. Um módulo não deve depender dos detalhes internos de infraestrutura de outro módulo.
 
-The dependency direction keeps business rules independent from external technologies.
+Essas regras mantêm as regras de negócio independentes das tecnologias externas.
 
-## Project Structure
+## Estrutura do projeto
 
-The following tree represents the main application and infrastructure boundaries.
+Estrutura resumida das fronteiras principais:
 
 ```text
 src/
 ├── bootstrap/
+│   ├── async-singleton.ts
 │   ├── http.ts
-│   └── identity.ts
+│   ├── identity.ts
+│   └── outbox.ts
 │
 ├── config/
-│   └── env.ts
 │
 ├── delivery/
 │   └── http/
-│       └── app.ts
-│
-├── modules/
-│   └── identity/
-│       ├── application/
-│       │   ├── commands/
-│       │   │   ├── register-user.handler.ts
-│       │   │   └── register-user.schema.ts
-│       │   ├── ports/
-│       │   └── email-already-registered.error.ts
-│       │
-│       ├── domain/
-│       │   ├── value-objects/
-│       │   ├── user.ts
-│       │   ├── user.schema.ts
-│       │   ├── terms-acceptance.ts
-│       │   └── user-registered.event.ts
-│       │
-│       └── infrastructure/
-│           ├── cryptography/
-│           │   └── argon2-password-hasher.ts
-│           └── persistence/
-│               ├── drizzle-identity-unit-of-work.ts
-│               └── repositories/
+│       ├── app.ts
+│       ├── identity.http.ts
+│       └── middleware/
 │
 ├── infrastructure/
 │   ├── database/
-│   │   ├── schema/
-│   │   ├── client.ts
-│   │   └── postgres.ts
 │   ├── rate-limiting/
-│   │   └── dynamodb-registration-rate-limiter.ts
-│   └── secrets/
-│       └── secrets-manager.ts
+│   ├── secrets/
+│   └── time/
+│
+├── modules/
+│   ├── identity/
+│   │   ├── application/
+│   │   ├── domain/
+│   │   └── infrastructure/
+│   │
+│   └── outbox/
+│       ├── application/
+│       └── infrastructure/
 │
 ├── lambda.ts
+├── outbox-lambda.ts
 └── server.ts
 ```
 
-The tree intentionally focuses on the main architectural boundaries. Tests, migrations, Terraform and CI/CD configuration are maintained outside `src/`.
+A estrutura é resumida e não lista todos os arquivos. Testes, migrações, Terraform e configurações de CI/CD ficam fora de `src/`.
 
-## HTTP Application Composition
+## Composição da aplicação HTTP
 
-The application has two execution entry points:
+A aplicação possui dois pontos de entrada HTTP:
 
-- `src/server.ts` starts the Express application as a local Node.js server.
-- `src/lambda.ts` adapts the same Express application to AWS Lambda through `serverless-http`.
+- `src/server.ts` inicia o Express como servidor Node.js local.
+- `src/lambda.ts` adapta a mesma aplicação Express para AWS Lambda por meio de `serverless-http`.
 
-Both entry points use the application composed in `src/bootstrap/http.ts`.
+Ambos utilizam a aplicação composta em `src/bootstrap/http.ts`.
 
 ```mermaid
 flowchart TB
-    Local["Local Node.js Runtime"]
-    Lambda["AWS Lambda Runtime"]
+    Local["Runtime Node.js local"]
+    Lambda["Runtime AWS Lambda"]
 
     Server["src/server.ts"]
     LambdaEntry["src/lambda.ts"]
@@ -242,150 +202,47 @@ flowchart TB
 
     Local --> Server
     Lambda --> LambdaEntry
-
     Server --> Bootstrap
     LambdaEntry --> Bootstrap
-
     Bootstrap --> App
 ```
 
-The HTTP application receives its dependencies through `createApp()`. It does not directly instantiate database connections or infrastructure adapters.
+A aplicação HTTP recebe suas dependências por `createApp()`. Ela não deve instanciar diretamente conexões com banco ou adaptadores de infraestrutura.
 
-## Registration Flow
+## Transações e consistência
 
-Registration is implemented by `RegisterUserHandler`.
+Operações que representam uma única ação de negócio devem persistir seus dados relacionados dentro de uma mesma transação.
 
-The HTTP boundary validates the incoming request with Zod before executing the use case.
+No cadastro, por exemplo, a criação do usuário, o registro do aceite dos Termos de Serviço, o token de verificação e o evento correspondente da Outbox são persistidos atomicamente.
 
-```mermaid
-sequenceDiagram
-    autonumber
+A implementação do Identity Unit of Work delimita essa transação. A Outbox garante que o evento não seja perdido entre a confirmação da transação de negócio e o processamento assíncrono.
 
-    actor Client
-    participant API as Express API
-    participant Handler as RegisterUserHandler
-    participant Hasher as Argon2PasswordHasher
-    participant UoW as Identity Unit of Work
-    participant DB as PostgreSQL
+O processamento posterior do evento ocorre fora da transação original. Consulte [Identity](identity.md) e [Outbox](outbox.md).
 
-    Client->>API: POST /identity/register
-    API->>API: Validate request with Zod
+## Testes
 
-    API->>Handler: Execute registration
+O projeto utiliza:
 
-    Handler->>Hasher: Hash password
-    Hasher-->>Handler: Password hash
+- Vitest para execução dos testes.
+- Supertest para testes HTTP.
+- Testcontainers para provisionar instâncias PostgreSQL descartáveis.
 
-    Handler->>Handler: Create User
-    Handler->>Handler: Create TermsAcceptance
-    Handler->>Handler: Pull domain events
+Os testes unitários verificam regras e casos de uso sem depender de serviços externos. Os testes de integração verificam o comportamento real dos adaptadores e do banco de dados.
 
-    Handler->>UoW: Begin transaction
-
-    UoW->>DB: Insert user
-    UoW->>DB: Insert terms acceptance
-    UoW->>DB: Append UserRegistered event
-
-    UoW->>DB: Commit transaction
-
-    UoW-->>Handler: Transaction completed
-    Handler-->>API: Registration result
-    API-->>Client: 201 Created
-```
-
-The registration operation:
-
-1. Hashes the supplied password using Argon2id.
-2. Creates a new user with a server-generated identifier.
-3. Normalises the email address through the domain value object.
-4. Creates the corresponding Terms of Service acceptance record.
-5. Retrieves the domain events raised by the user.
-6. Persists the user, terms acceptance and outbox events in one database transaction.
-
-The client cannot choose the acceptance timestamp or Terms of Service version. The version is provided by the configured `TermsPolicy`.
-
-If a persistence operation fails, the transaction is rolled back. A partially registered user cannot be committed without the associated terms acceptance and outbox event.
-
-## Transactional Outbox
-
-The Identity module uses a transactional outbox to persist domain events reliably.
-
-The `UserRegistered` event is appended to the outbox inside the same transaction as the user and terms acceptance records.
-
-This guarantees that the event is persisted if and only if the registration transaction commits.
-
-Current implementation status:
-
-| Capability | Status |
-|---|---|
-| Domain event creation | Implemented |
-| Outbox persistence | Implemented |
-| Transactional event insertion | Implemented |
-| Background outbox dispatcher | Not implemented |
-| External event publisher | Not implemented |
-
-The outbox currently provides durable event persistence. It does not yet deliver events to external systems.
-
-## Database Architecture
-
-PostgreSQL is hosted by Neon.
-
-Drizzle ORM provides typed database access and schema management. The shared database client is located at:
-
-```text
-src/infrastructure/database/
-├── schema/
-├── client.ts
-└── postgres.ts
-```
-
-Identity-specific persistence adapters are located inside the Identity module:
-
-```text
-src/modules/identity/infrastructure/persistence/
-├── drizzle-identity-unit-of-work.ts
-└── repositories/
-```
-
-The Identity Unit of Work creates transaction-scoped repositories and executes the supplied operation within a Drizzle transaction.
-
-Database schemas and migrations are maintained separately from domain entities.
-
-## Testing Strategy
-
-The project uses:
-
-- Vitest for unit and integration test execution.
-- Supertest for HTTP-level testing.
-- Testcontainers for disposable PostgreSQL instances.
-
-Tests are organised around the application boundaries.
-
-Integration tests exercise real PostgreSQL behaviour, including persistence constraints and transaction commit and rollback behaviour.
-
-Integration tests must use disposable databases and must never connect to production databases.
-
-Run the test suite:
+Os testes de integração devem utilizar bancos descartáveis e nunca devem se conectar a bancos de produção.
 
 ```bash
 make test
-```
-
-Compile the application:
-
-```bash
 make build
 ```
 
-## Architectural Principles
+## Princípios arquiteturais
 
-The architecture is guided by the following principles:
-
-- Business capabilities own their domain and application logic.
-- Application use cases depend on ports, not infrastructure implementations.
-- Infrastructure adapters implement application-defined contracts.
-- Domain rules remain independent of frameworks and databases.
-- Composition happens at explicit bootstrap boundaries.
-- HTTP delivery remains separate from business logic.
-- Persistence operations that form one business action share a transaction.
-- Integration tests verify real infrastructure behaviour.
+- Cada módulo é responsável por sua capacidade de negócio.
+- Casos de uso dependem de portas, não de implementações concretas.
+- Adaptadores de infraestrutura implementam contratos da aplicação.
+- O domínio permanece independente de frameworks e bancos de dados.
+- A composição ocorre em pontos explícitos de bootstrap.
+- A entrega HTTP permanece separada das regras de negócio.
+- Operações relacionadas de persistência compartilham uma transação.
+- Testes de integração verificam o comportamento real da infraestrutura.

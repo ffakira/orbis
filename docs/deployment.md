@@ -1,74 +1,95 @@
-# Deployment and Infrastructure
+# Implantação e infraestrutura
 
-This document describes the AWS infrastructure, Terraform configuration, secrets management and production deployment process for Orbis API.
+Este documento descreve a infraestrutura AWS, a configuração Terraform, o gerenciamento de segredos e o processo de implantação de produção da API Orbis.
 
-## Infrastructure Overview
+## Visão geral da infraestrutura
 
-The application can run locally as a Node.js process or in production as an AWS Lambda function.
+A aplicação pode ser executada localmente como processo Node.js ou em produção por meio de funções AWS Lambda.
 
-The production environment uses:
-
-| Component | Responsibility |
+| Componente | Responsabilidade |
 |---|---|
-| Amazon API Gateway HTTP API | Public HTTP entry point |
-| AWS Lambda | Node.js application runtime |
-| Amazon DynamoDB | Registration rate-limit storage |
-| AWS Secrets Manager | Database, authentication and email verification secrets |
-| Parameters and Secrets Lambda Extension | Runtime secret retrieval |
-| Amazon CloudWatch Logs | Application and Lambda logs |
-| Amazon S3 | Terraform remote state |
-| GitHub Actions | CI/CD and production deployment |
-| AWS IAM OIDC | GitHub Actions authentication |
-| Neon | PostgreSQL hosting |
+| Amazon API Gateway HTTP API | Ponto de entrada HTTP público |
+| AWS Lambda | Runtime da aplicação HTTP e do processador Outbox |
+| Amazon DynamoDB | Armazenamento do limite de requisições de cadastro |
+| AWS Secrets Manager | Credenciais e segredos da aplicação |
+| Parameters and Secrets Lambda Extension | Consulta de segredos durante a execução |
+| Amazon EventBridge | Agendamento do processamento Outbox |
+| Amazon CloudWatch Logs | Logs da aplicação e das funções Lambda |
+| Amazon S3 | Estado remoto do Terraform |
+| GitHub Actions | CI/CD e implantação |
+| AWS IAM OIDC | Autenticação do GitHub Actions na AWS |
+| Neon | Hospedagem do PostgreSQL |
+| Resend | Entrega de e-mails |
 
-PostgreSQL is hosted by Neon, not Amazon RDS.
+O PostgreSQL é hospedado pela Neon, não pelo Amazon RDS.
 
-## Deployment Architecture
+## Arquitetura de implantação
 
 ```mermaid
 flowchart TB
-    Client["HTTP Client"]
+    Client["Cliente HTTP"]
 
-    subgraph AWS["AWS Cloud"]
+    subgraph AWS["Nuvem AWS"]
         Gateway["API Gateway HTTP API"]
-        Lambda["AWS Lambda - Node.js 22"]
+        ApiLambda["Lambda da API"]
+        OutboxLambda["Lambda Outbox"]
+        Schedule["Amazon EventBridge"]
         DynamoDB[("DynamoDB")]
-        Extension["Parameters and Secrets Lambda Extension"]
+        Extension["Parameters and Secrets Extension"]
         Secrets[("AWS Secrets Manager")]
-        CloudWatch["CloudWatch Logs"]
+        Logs["CloudWatch Logs"]
     end
 
     Neon[("Neon PostgreSQL")]
+    Resend["Resend"]
 
     Client --> Gateway
-    Gateway --> Lambda
-
-    Lambda --> DynamoDB
-    Lambda --> Extension
+    Gateway --> ApiLambda
+    Schedule --> OutboxLambda
+    ApiLambda --> DynamoDB
+    ApiLambda --> Extension
+    OutboxLambda --> Extension
     Extension --> Secrets
-    Lambda --> CloudWatch
-    Lambda --> Neon
+    ApiLambda --> Neon
+    OutboxLambda --> Neon
+    OutboxLambda --> Resend
+    ApiLambda --> Logs
+    OutboxLambda --> Logs
 ```
 
-The Lambda function uses the `serverless-http` adapter to expose the Express application through API Gateway.
+A Lambda HTTP utiliza `serverless-http` para disponibilizar a aplicação Express por meio do API Gateway.
 
-The Lambda is configured with:
+A Lambda Outbox é independente e acionada pelo EventBridge.
 
-| Configuration | Value |
+### Configuração da Lambda HTTP
+
+| Configuração | Valor |
 |---|---|
 | Runtime | `nodejs22.x` |
 | Handler | `dist/lambda.handler` |
-| Memory | 256 MB |
-| Timeout | 15 seconds |
-| Architecture | x86_64 |
-| Database | Neon PostgreSQL |
-| Database connection pool maximum | 2 connections per execution environment |
+| Memória | 256 MB |
+| Timeout | 15 segundos |
+| Banco | Neon PostgreSQL |
+| Máximo de conexões do pool | 2 por ambiente de execução |
 
-The function currently connects to Neon over the internet and is not attached to a VPC.
+A função conecta-se ao Neon pela internet e atualmente não está associada a uma VPC.
 
-## Terraform Structure
+### Configuração da Lambda Outbox
 
-Terraform configuration is maintained under `terraform/`.
+| Configuração | Valor |
+|---|---|
+| Runtime | `nodejs22.x` |
+| Handler | `dist/outbox-lambda.handler` |
+| Memória | 256 MB |
+| Timeout | 60 segundos |
+| Agendador | Amazon EventBridge |
+| Frequência padrão | A cada 1 minuto |
+
+Os parâmetros de lote, lease e retentativa são configurados separadamente da Lambda HTTP.
+
+## Estrutura Terraform
+
+A infraestrutura é mantida em `terraform/`.
 
 ```text
 terraform/
@@ -84,425 +105,330 @@ terraform/
 └── versions.tf
 ```
 
-### Root Configuration
-
-The root Terraform configuration composes the infrastructure modules and passes their dependencies.
-
-| Module | Responsibility |
+| Módulo | Responsabilidade |
 |---|---|
-| `api-gateway` | HTTP API, Lambda integration, routes and stage |
-| `lambda` | Lambda function, deployment package and environment |
-| `rate-limiting` | DynamoDB registration rate-limit table |
-| `security` | Lambda execution role and IAM policies |
+| `api-gateway` | API HTTP, integração com Lambda, rotas e estágio |
+| `lambda` | Funções Lambda, pacote e variáveis de ambiente |
+| `rate-limiting` | Tabela DynamoDB para limite de cadastro |
+| `security` | Papéis de execução e políticas IAM |
 
-The AWS provider defaults to `us-east-1`.
+A região padrão do provedor AWS é `us-east-1`.
 
-The Terraform configuration requires Terraform `>= 1.5.0` and AWS provider `~> 6.0`.
+A configuração requer Terraform `>= 1.5.0` e AWS provider `~> 6.0`.
 
-### Lambda Deployment Package
+## Pacote de implantação
 
-The Lambda deployment package is generated through the Makefile:
+O pacote das funções Lambda é preparado pelo Makefile:
 
 ```bash
 make package
 ```
 
-This command:
+O processo:
 
-1. Compiles TypeScript.
-2. Creates the `build/` directory.
-3. Copies the compiled application into `build/`.
-4. Copies `package.json` and `package-lock.json`.
-5. Installs production dependencies into the staging directory.
+1. Compila o TypeScript.
+2. Cria o diretório `build/`.
+3. Copia a aplicação compilada para `build/`.
+4. Copia `package.json` e `package-lock.json`.
+5. Instala as dependências de produção no diretório de preparação.
 
-Terraform packages the contents of `build/` into `terraform/lambda.zip`.
+O Terraform compacta o conteúdo de `build/` em `terraform/lambda.zip`.
 
-The Lambda handler is configured as:
+O pacote precisa conter o diretório `dist/` e as dependências de produção necessárias.
 
-```text
-dist/lambda.handler
-```
+O arquivo `.env` nunca deve ser incluído no pacote.
 
-The deployment package must contain the compiled `dist/` directory and the production dependencies required by the application.
+## Gerenciamento de segredos
 
-The `.env` file must never be included in the deployment package.
+Credenciais e segredos criptográficos de produção são armazenados no AWS Secrets Manager.
 
-## AWS Secrets Management
+A configuração Terraform utiliza um segredo de aplicação consolidado, identificado por `application_secret_name`. Os carregadores da aplicação extraem as propriedades necessárias para cada integração.
 
-Production credentials and cryptographic secrets are stored in AWS Secrets Manager.
-
-The current Terraform defaults are:
-
-| Secret | Name |
-|---|---|
-| Database | `restaurant-cmv-api/database` |
-| Authentication | `restaurant-cmv-api/authentication` |
-| Email verification | `restaurant-cmv-api/email-verification` |
-
-These names can be overridden through Terraform variables.
-
-### Database Secret
-
-Create the database secret in AWS Secrets Manager.
-
-Its JSON structure must be:
+A estrutura JSON do segredo deve conter as propriedades exigidas pelos carregadores, incluindo:
 
 ```json
 {
-  "DATABASE_URL": "postgresql://<user>:<password>@<host>/<database>?sslmode=require"
+  "DATABASE_URL": "postgresql://<usuario>:<senha>@<host>/<banco>?sslmode=require",
+  "JWT_SECRET": "<segredo-aleatorio-em-base64>",
+  "EMAIL_VERIFICATION_SECRET": "<segredo-aleatorio-em-base64>",
+  "RESEND_API_KEY": "<chave-de-api-do-resend>"
 }
 ```
 
-Use the appropriate Neon connection string.
+Ajuste o conteúdo conforme os nomes efetivamente definidos pelos esquemas de configuração e carregadores de segredos do código.
 
-For serverless workloads, use a Neon connection pooling endpoint where appropriate.
+### Banco de dados
 
-### Authentication Secret
+Utilize a URL de conexão fornecida pelo Neon.
 
-The authentication secret uses this JSON structure:
+Para cargas serverless, considere o endpoint de pooling do Neon quando apropriado.
 
-```json
-{
-  "JWT_SECRET": "<base64-encoded-random-secret>"
-}
-```
+### Segredo de autenticação
 
-The application validates the encoded value and requires at least 32 bytes of decoded random data.
+`JWT_SECRET` é utilizado para assinatura e verificação de tokens de acesso.
 
-The secret is provisioned and its retrieval capability is available in the infrastructure layer. It should not be confused with an authentication endpoint or complete authentication flow.
+O valor Base64 decodificado deve conter pelo menos 32 bytes de dados aleatórios criptograficamente seguros.
 
-### Email Verification Secret
+### Segredo de verificação de e-mail
 
-Email verification uses a dedicated cryptographic secret, separate from the authentication secret.
+`EMAIL_VERIFICATION_SECRET` é independente do segredo JWT e é utilizado pelo assinador HMAC-SHA256 dos tokens de verificação.
 
-Its AWS Secrets Manager JSON structure must be:
+O banco armazena o hash do token bearer, não seu valor em texto puro.
 
-```json
-{
-  "EMAIL_VERIFICATION_SECRET": "<base64-encoded-random-secret>"
-}
-```
+Rotacionar um segredo não deve alterar implicitamente o outro.
 
-Generate a suitable random value with:
+### Chave do Resend
+
+`RESEND_API_KEY` permite que o adaptador de e-mail autentique chamadas ao serviço Resend.
+
+Não registre a chave em logs nem a inclua em respostas HTTP.
+
+### Geração de segredo aleatório
+
+Uma base aleatória pode ser gerada com:
 
 ```bash
 openssl rand -base64 32
 ```
 
-The application decodes the Base64 value and requires at least 32 bytes of cryptographically secure random data.
+### Consulta em runtime
 
-This secret is used by the email verification token signer to derive bearer tokens using HMAC-SHA256.
+A Lambda utiliza a Parameters and Secrets Lambda Extension para consultar segredos por meio do endpoint HTTP local da extensão.
 
-The application stores only the SHA-256 hash of the bearer token in the database. The raw bearer token and the cryptographic secret must never be persisted in the database or included in outbox events.
+O acesso utiliza o token de sessão fornecido pelo runtime Lambda.
 
-Keep this secret independent from `JWT_SECRET`. Rotating one secret must not implicitly change the other.
+Os segredos são resolvidos sob demanda e podem ser armazenados em cache no ambiente de execução.
 
-### Runtime Secret Retrieval
-
-The Lambda function receives the secret ARNs through environment variables:
-
-```text
-DB_SECRET_ARN
-AUTHENTICATION_SECRET_ARN
-EMAIL_VERIFICATION_SECRET_ARN
-```
-
-The Parameters and Secrets Lambda Extension retrieves secrets through its local HTTP endpoint.
-
-The extension uses the Lambda execution environment's AWS session token for authentication.
-
-Secrets are resolved lazily by the application and cached within the Lambda execution environment.
-
-In local development, the application can use environment variables directly instead of Secrets Manager ARNs:
+No desenvolvimento local, a aplicação pode utilizar variáveis de ambiente diretamente, conforme o esquema de configuração:
 
 ```dotenv
-DATABASE_URL=postgresql://<user>:<password>@<host>/<database>?sslmode=require
-JWT_SECRET=<base64-encoded-random-secret>
-EMAIL_VERIFICATION_SECRET=<base64-encoded-random-secret>
+DATABASE_URL=postgresql://<usuario>:<senha>@<host>/<banco>?sslmode=require
+JWT_SECRET=<segredo-em-base64>
+EMAIL_VERIFICATION_SECRET=<segredo-em-base64>
+RESEND_API_KEY=<chave-do-resend>
 ```
 
-Never:
+Nunca:
 
-- Commit secrets to Git.
-- Put secret values in Terraform variables or `.tfvars` files.
-- Log database connection strings or cryptographic secrets.
-- Include `.env` in deployment artifacts.
-- Expose secret values through API responses.
+- Versione valores de segredos no Git.
+- Inclua credenciais em arquivos Terraform ou `.tfvars`.
+- Registre URLs de conexão ou segredos em logs.
+- Inclua `.env` no pacote de implantação.
+- Exponha valores de segredos nas respostas da API.
 
-## DynamoDB Registration Rate Limiting
+## Limitação de requisições de cadastro
 
-The rate-limiting module provisions a DynamoDB table for registration requests.
+O módulo `rate-limiting` provisiona uma tabela DynamoDB para controlar tentativas de cadastro.
 
-The table uses:
+A tabela utiliza:
 
-| Attribute | Key |
+| Atributo | Chave ou finalidade |
 |---|---|
-| `rate_limit_key` | Partition key |
-| `window_start` | Sort key |
-| `expires_at` | TTL attribute |
+| `rate_limit_key` | Chave de partição |
+| `window_start` | Chave de ordenação |
+| `expires_at` | Atributo TTL |
 
-The table uses on-demand billing and server-side encryption.
+A tabela utiliza cobrança sob demanda e criptografia em repouso.
 
-The application applies registration rate limiting by source IP address.
+Configuração padrão:
 
-Current default configuration:
-
-| Setting | Value |
+| Parâmetro | Valor |
 |---|---:|
-| Maximum attempts | 5 |
-| Window | 900 seconds |
-| API Gateway sustained rate | 2 requests/second |
-| API Gateway burst limit | 5 requests |
+| Máximo de tentativas | 5 |
+| Janela | 900 segundos |
+| Limite sustentado no API Gateway | 2 requisições/segundo |
+| Limite de burst no API Gateway | 5 requisições |
 
-The application-level rate limiter uses atomic DynamoDB updates to enforce the per-IP request limit.
+O limitador da aplicação utiliza atualizações atômicas no DynamoDB para aplicar o limite por endereço IP.
 
-If the rate limiter cannot determine the request IP or DynamoDB is unavailable, registration fails closed with a service-unavailable response.
+Se o endereço IP não estiver disponível ou o DynamoDB falhar, o cadastro falha de forma restritiva e retorna indisponibilidade.
 
-API Gateway throttling is an additional protection layer. It does not replace application-level per-IP rate limiting.
+O throttling do API Gateway é uma camada adicional, não substitui o limite por IP da aplicação.
 
-The Lambda execution role receives permission to update the rate-limit table.
+## IAM e permissões
 
-## IAM Security
+Os papéis de execução das Lambdas são provisionados pelo módulo Terraform `security`.
 
-The Lambda execution role is provisioned by the Terraform security module.
+As permissões devem seguir o princípio do menor privilégio e contemplar somente os recursos necessários a cada função.
 
-Its permissions include:
+Entre as permissões necessárias estão:
 
-- Basic Lambda execution and CloudWatch logging.
-- `secretsmanager:GetSecretValue` for the configured database, authentication and email verification secrets.
-- `dynamodb:UpdateItem` for the registration rate-limit table.
+- Execução da Lambda e gravação de logs no CloudWatch.
+- Leitura dos segredos necessários no Secrets Manager.
+- Atualização da tabela de limite de cadastro pela Lambda HTTP.
+- Acesso aos recursos exigidos pela Lambda Outbox.
 
-The role is restricted to the resources required by the Lambda function.
+O EventBridge recebe permissão específica para invocar a Lambda Outbox.
 
-GitHub Actions uses separate IAM roles for Terraform planning and production deployment.
+O GitHub Actions utiliza papéis separados para planejamento e aplicação do Terraform.
 
-## Terraform Remote State
+## Estado remoto do Terraform
 
-Terraform uses an Amazon S3 backend to share infrastructure state between authorised local operations and GitHub Actions.
+O Terraform utiliza um backend Amazon S3 para compartilhar o estado entre operações locais autorizadas e o GitHub Actions.
 
-Current backend configuration:
+Configuração atual:
 
-| Setting | Value |
+| Configuração | Valor |
 |---|---|
 | Backend | Amazon S3 |
 | Bucket | `orbis-terraform-state-450753703757-us-east-1` |
-| State key | `orbis/production/terraform.tfstate` |
-| Region | `us-east-1` |
-| Encryption | Enabled |
-| State locking | S3 lockfile |
+| Chave | `orbis/production/terraform.tfstate` |
+| Região | `us-east-1` |
+| Criptografia | Habilitada |
+| Bloqueio | Arquivo de lock do S3 |
 
-The backend configuration is defined in `terraform/versions.tf`.
+O bucket precisa existir antes da inicialização do Terraform.
 
-The state bucket must exist before Terraform initialisation.
+Ele deve manter versionamento, criptografia no servidor, bloqueio de acesso público e política que exija transporte seguro.
 
-The bucket is provisioned separately from the Terraform configuration that uses it, avoiding a circular dependency during bootstrap.
+O estado Terraform e os planos salvos podem conter informações sensíveis. Nunca os versione nem os publique como artefatos públicos.
 
-The bucket should retain:
+## Configuração local da AWS
 
-- Versioning.
-- Server-side encryption.
-- Public access blocking.
-- A bucket policy requiring secure transport.
-
-Terraform state and saved plan files may contain sensitive information. They must never be committed to Git or exposed in public artifacts.
-
-The remote backend is shared by authorised local Terraform operations and the production deployment workflow.
-
-## Local AWS Configuration
-
-Install and configure the AWS CLI.
-
-For example:
+Instale e configure a AWS CLI:
 
 ```bash
 aws configure
 ```
 
-Verify the active AWS identity:
+Verifique a identidade ativa:
 
 ```bash
 aws sts get-caller-identity
 ```
 
-The default Terraform region is `us-east-1`.
-
-The configured AWS identity must have the permissions required for the intended operation.
-
-### Terraform Initialization
-
-Initialise the Terraform working directory:
+Inicialize o Terraform:
 
 ```bash
 terraform -chdir=terraform init
 ```
 
-Validate the configuration:
+Valide a configuração:
 
 ```bash
 make terraform-fmt
 make terraform-validate
 ```
 
-Preview infrastructure changes:
+Gere um plano:
 
 ```bash
 make terraform-plan
 ```
 
-Apply changes locally only when explicitly authorised:
+A aplicação local de alterações deve ocorrer somente quando autorizada:
 
 ```bash
 make terraform-apply
 ```
 
-These commands require AWS credentials and access to the remote state backend.
+Esses comandos exigem credenciais AWS e acesso ao backend remoto.
 
-Local Terraform operations are intended for controlled infrastructure maintenance and troubleshooting. They are not the standard production deployment procedure.
+Operações locais são destinadas à manutenção controlada e investigação. O fluxo padrão de implantação em produção é o GitHub Actions.
 
-**Important:** `make deploy` executes the local deployment workflow defined in the Makefile. It runs tests, formats and validates Terraform, and applies infrastructure changes using the active local AWS credentials. Do not use it as a substitute for the approved production GitHub Actions workflow.
+Atenção: `make deploy` executa o fluxo local definido no Makefile e utiliza as credenciais AWS locais. Não o utilize como substituto do fluxo de produção aprovado pelo GitHub Actions.
 
-## GitHub Actions Production Deployment
+## Implantação de produção pelo GitHub Actions
 
-Production deployment is initiated manually through GitHub Actions.
-
-The workflow is:
+A implantação de produção é iniciada manualmente pelo workflow:
 
 ```text
 .github/workflows/deploy.yml
 ```
 
-It uses `workflow_dispatch` and only runs when the selected branch is `main`.
+O workflow utiliza `workflow_dispatch` e deve ser executado a partir da branch `main`.
 
-The workflow requires a published Terms of Service version as an input.
+Ele exige a versão publicada dos Termos de Serviço como entrada.
 
-### Deployment Pipeline
+### Etapas do pipeline
 
 ```mermaid
 flowchart TB
-    Developer["Developer"]
-
-    subgraph GitHub["GitHub Actions"]
-        Trigger["Manual workflow_dispatch"]
-        Checks["Pre-deployment Checks"]
-        Package["Lambda Package"]
-        Plan["Terraform Plan"]
-        Artifact[("Saved Terraform Plan")]
-        Approval["Production Environment Approval"]
-        Apply["Terraform Apply"]
-        Verify["Post-deployment Verification"]
-    end
-
-    subgraph AWS["AWS"]
-        OIDC["GitHub OIDC"]
-        PlanRole["Terraform Plan IAM Role"]
-        DeployRole["Terraform Deployment IAM Role"]
-        State[("S3 Remote State")]
-        Lambda["AWS Lambda"]
-        Gateway["API Gateway"]
-        DynamoDB[("DynamoDB")]
-    end
+    Developer["Desenvolvedor"]
+    Trigger["Execução manual"]
+    Checks["Testes e compilação"]
+    Package["Pacote Lambda"]
+    Plan["Terraform Plan"]
+    Artifact["Plano e pacote salvos"]
+    Approval["Aprovação do ambiente production"]
+    Apply["Terraform Apply"]
+    Verify["Verificação após implantação"]
 
     Developer --> Trigger
     Trigger --> Checks
     Checks --> Package
     Package --> Plan
-    Plan --> OIDC
-    OIDC --> PlanRole
-    PlanRole --> State
     Plan --> Artifact
     Artifact --> Approval
     Approval --> Apply
-    Apply --> OIDC
-    OIDC --> DeployRole
-    DeployRole --> State
-    Apply --> Lambda
-    Apply --> Gateway
-    Apply --> DynamoDB
     Apply --> Verify
 ```
 
-### Deployment Steps
+O processo:
 
-The production workflow performs the following operations:
+1. Obtém o código e instala as dependências.
+2. Executa os testes e compila a aplicação.
+3. Prepara o pacote Lambda.
+4. Inicializa o Terraform com o backend S3.
+5. Gera e salva o plano de infraestrutura.
+6. Publica o plano e o pacote como artefatos temporários.
+7. Aguarda aprovação do ambiente GitHub `production`.
+8. Aplica o plano previamente gerado.
+9. Verifica os endpoints `/health` e `/ready`.
 
-1. **Pre-deployment checks:** checks out the repository, installs dependencies, runs tests and builds the Lambda package.
-2. **Terraform initialization:** initialises Terraform using the remote S3 backend.
-3. **Terraform plan:** generates and saves an infrastructure plan.
-4. **Plan artifact:** uploads the saved plan and Lambda archive as short-lived workflow artifacts.
-5. **Production approval:** waits for approval through the GitHub Environment named `production`.
-6. **Terraform apply:** applies the previously saved plan.
-7. **Post-deployment verification:** checks the deployed `/health` and `/ready` endpoints.
+A etapa de aplicação utiliza o mesmo plano salvo durante o planejamento. Ela não gera automaticamente um novo plano depois da aprovação.
 
-The apply stage uses the same saved plan generated during the planning stage. It does not automatically generate a new plan after approval.
+### Iniciar uma implantação
 
-### Starting a Production Deployment
+1. Abra o repositório no GitHub.
+2. Acesse a aba **Actions**.
+3. Selecione **Production Deployment**.
+4. Clique em **Run workflow**.
+5. Selecione a branch `main`.
+6. Informe a versão publicada dos Termos de Serviço.
+7. Inicie o workflow.
 
-1. Open the repository on GitHub.
-2. Navigate to the **Actions** tab.
-3. Select **Production Deployment**.
-4. Click **Run workflow**.
-5. Select the `main` branch.
-6. Enter the published Terms of Service version.
-7. Start the workflow.
+A aplicação aguarda a aprovação de um revisor autorizado no ambiente `production`.
 
-The deployment runs only after the pre-deployment checks and Terraform planning stage complete successfully.
+### Configuração do GitHub
 
-The apply stage waits for an authorised reviewer to approve the `production` environment.
+O repositório precisa das seguintes variáveis:
 
-### GitHub Configuration
-
-The repository requires the following GitHub Actions variables:
-
-| Variable | Purpose |
+| Variável | Finalidade |
 |---|---|
-| `AWS_REGION` | AWS deployment region |
-| `AWS_PLAN_ROLE_ARN` | IAM role assumed during Terraform planning |
-| `AWS_ROLE_ARN` | IAM role assumed during production deployment |
+| `AWS_REGION` | Região AWS |
+| `AWS_PLAN_ROLE_ARN` | Papel IAM para planejamento Terraform |
+| `AWS_ROLE_ARN` | Papel IAM para implantação de produção |
 
-The GitHub repository must be configured with:
+Também é necessário configurar:
 
-- An AWS IAM OIDC identity provider for GitHub Actions.
-- An IAM role for Terraform planning.
-- An IAM role for production deployment.
-- Trust policies restricted to the authorised repository and workflow context.
-- A protected GitHub Environment named `production`.
-- Required reviewers for production approval.
+- Provedor de identidade AWS IAM OIDC para GitHub Actions.
+- Papel IAM para planejamento Terraform.
+- Papel IAM para implantação.
+- Políticas de confiança restritas ao repositório e contexto do workflow autorizados.
+- Ambiente GitHub chamado `production`.
+- Revisores obrigatórios para aprovação de produção.
 
-The workflow uses OIDC federation rather than long-lived AWS access keys stored as GitHub Secrets.
+O workflow utiliza federação OIDC em vez de chaves AWS de longa duração armazenadas como secrets do GitHub.
 
-### Deployment Permissions
+A declaração de um ambiente no workflow, por si só, não configura revisores obrigatórios. Essa proteção deve ser configurada nas definições do repositório.
 
-The workflow uses distinct roles for planning and applying infrastructure changes.
+## Verificação após implantação
 
-| Role | Responsibility |
-|---|---|
-| Terraform Plan Role | Read infrastructure and generate a Terraform plan |
-| Terraform Deployment Role | Apply the approved infrastructure plan |
-
-The roles should follow least-privilege principles.
-
-The production environment approval must be configured in GitHub repository settings. A workflow environment declaration alone does not establish reviewer protection.
-
-## Post-deployment Verification
-
-After Terraform applies the saved plan, the workflow retrieves the deployed API URL from Terraform outputs.
-
-It then verifies:
+Depois da aplicação do plano Terraform, o workflow obtém a URL da API pelos outputs do Terraform e verifica:
 
 ```text
 GET /health
 GET /ready
 ```
 
-The health endpoint verifies that the application responds.
+O endpoint `/health` verifica se a aplicação responde.
 
-The readiness endpoint verifies that the application can connect to PostgreSQL.
+O endpoint `/ready` verifica a conectividade com o PostgreSQL.
 
-Both checks must succeed for the workflow to complete successfully.
+As duas verificações precisam ser concluídas com sucesso para que o workflow termine sem erro.
 
-### Manual Verification
-
-The Makefile provides commands for checking the deployed API:
+### Verificação manual
 
 ```bash
 make health
@@ -510,98 +436,99 @@ make ready
 make check
 ```
 
-Inspect the Lambda configuration:
+Inspecionar a configuração da Lambda:
 
 ```bash
 make status
 ```
 
-Follow CloudWatch logs:
+Acompanhar logs:
 
 ```bash
 make logs
 ```
 
-These commands use the API URL and AWS region currently configured in the Makefile.
+Esses comandos utilizam a URL da API e a região AWS configuradas no Makefile.
 
-## Troubleshooting
+## Diagnóstico
 
-### API Health Check Fails
+### Verificação de saúde falha
 
-Investigate:
+Investigue:
 
-- Lambda function state.
-- API Gateway integration.
-- Lambda execution logs.
-- Recent Terraform changes.
-- Deployment package contents.
+- Estado da função Lambda.
+- Integração do API Gateway.
+- Logs de execução da Lambda.
+- Alterações recentes no Terraform.
+- Conteúdo do pacote de implantação.
 
-### API Health Works but Readiness Fails
+### Saúde funciona, mas readiness falha
 
-Investigate:
+Investigue:
 
-- Neon database availability.
-- Database connection string.
-- Database credentials in Secrets Manager.
-- Lambda IAM permissions.
-- Parameters and Secrets Lambda Extension availability.
-- Database connection limits.
-- Lambda CloudWatch logs.
+- Disponibilidade do Neon.
+- URL de conexão com o banco.
+- Credenciais no Secrets Manager.
+- Permissões IAM da Lambda.
+- Disponibilidade da Parameters and Secrets Lambda Extension.
+- Limites de conexão do banco.
+- Logs da Lambda no CloudWatch.
 
-Do not print or share the database connection string while troubleshooting.
+Não imprima nem compartilhe a URL de conexão durante o diagnóstico.
 
-### Registration Returns HTTP 429
+### Cadastro retorna HTTP 429
 
-The registration rate limiter has rejected the request.
+O limitador rejeitou a requisição.
 
-Check:
+Verifique:
 
-- The source IP address.
-- The configured rate-limit maximum attempts.
-- The rate-limit window.
-- DynamoDB table availability.
+- Endereço IP de origem.
+- Limite máximo de tentativas.
+- Duração da janela.
+- Disponibilidade da tabela DynamoDB.
 
-### Registration Returns HTTP 503
+### Cadastro retorna HTTP 503
 
-The rate limiter may be unavailable or the source IP address may be missing from the API Gateway event.
+O limitador pode estar indisponível ou o endereço IP pode não estar presente no evento do API Gateway.
 
-Inspect the Lambda logs and DynamoDB permissions.
+Verifique os logs da Lambda e as permissões do DynamoDB.
 
-### Email Verification Secret Retrieval Fails
+### Processamento Outbox falha
 
-Investigate:
+Investigue:
 
-- Whether the email verification secret exists in AWS Secrets Manager.
-- Whether `EMAIL_VERIFICATION_SECRET_ARN` references the correct secret.
-- Whether the Lambda execution role has `secretsmanager:GetSecretValue` permission for that secret.
-- Whether the secret JSON contains the `EMAIL_VERIFICATION_SECRET` property.
-- Whether the Base64 value decodes to at least 32 bytes.
-- Whether the Parameters and Secrets Lambda Extension is available.
+- Invocações agendadas pelo EventBridge.
+- Estado e logs da Lambda Outbox.
+- Disponibilidade do PostgreSQL.
+- Acesso aos segredos necessários.
+- Disponibilidade e credenciais do Resend.
+- Eventos com tentativas elevadas ou marcados como dead-letter.
+- Permissões IAM da função Outbox.
 
-Do not log or share the secret value while troubleshooting.
+Não registre tokens, chaves ou credenciais durante a investigação.
 
-### Terraform State Lock Errors
+### Erro de bloqueio do estado Terraform
 
-Check whether another Terraform operation is currently running.
+Verifique se outra operação Terraform está em execução.
 
-Do not manually delete a state lock without verifying that the operation holding it has stopped.
+Não remova manualmente um bloqueio sem confirmar que a operação responsável foi encerrada.
 
-Use the normal Terraform state-lock recovery procedure when necessary.
+Utilize o procedimento normal de recuperação de lock do Terraform.
 
-## Operational Considerations
+## Considerações operacionais
 
-- Keep AWS IAM permissions restricted to required resources.
-- Use OIDC instead of long-lived AWS access keys.
-- Protect the GitHub `production` environment with reviewer approval.
-- Review the saved Terraform plan before approving deployment.
-- Apply only the plan that was reviewed.
-- Keep Terraform state versioning enabled.
-- Restrict access to the Terraform state bucket.
-- Never commit Terraform state, saved plans or deployment archives.
-- Monitor Lambda concurrency and PostgreSQL connection usage.
-- Each warm Lambda execution environment maintains its own PostgreSQL connection pool.
-- Use Neon connection pooling where appropriate for serverless workloads.
-- Keep database migrations versioned and reviewed.
-- Run integration tests against disposable databases.
-- Never run automated integration tests against production databases.
-- Keep `.env` and all credentials outside the deployment package.
+- Restrinja permissões IAM aos recursos necessários.
+- Utilize OIDC em vez de chaves AWS de longa duração.
+- Proteja o ambiente GitHub `production` com aprovação.
+- Revise o plano Terraform antes de aprovar.
+- Aplique somente o plano revisado.
+- Mantenha o versionamento do bucket de estado.
+- Restrinja o acesso ao bucket do Terraform.
+- Nunca versione estado, planos salvos ou pacotes de implantação.
+- Monitore concorrência das Lambdas e conexões PostgreSQL.
+- Considere pooling do Neon para workloads serverless.
+- Mantenha migrações versionadas e revisadas.
+- Execute testes de integração somente contra bancos descartáveis.
+- Nunca execute testes automatizados de integração contra produção.
+- Mantenha `.env` e credenciais fora do pacote de implantação.
+- Monitore falhas e eventos em dead-letter do Outbox.

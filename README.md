@@ -1,273 +1,200 @@
-# Orbis API
+# API Orbis
 
-Backend API da plataforma **Orbis**, desenvolvida com Node.js, TypeScript e Express 5.
+API de backend da plataforma **Orbis**, desenvolvida com Node.js, TypeScript e Express 5.
 
-O projeto utiliza uma arquitetura modular baseada em **Hexagonal Architecture (Ports and Adapters)**, PostgreSQL com Drizzle ORM e pode ser executado localmente ou como uma AWS Lambda integrada ao Amazon API Gateway.
+O projeto utiliza uma arquitetura modular baseada em **Arquitetura Hexagonal (Ports and Adapters)**, PostgreSQL com Drizzle ORM e execução local ou em AWS Lambda integrada ao Amazon API Gateway.
 
 O PostgreSQL é hospedado pela [Neon](https://neon.tech/), enquanto a infraestrutura AWS é gerenciada com Terraform.
 
-## Technology Stack
+## Tecnologias
 
 | Categoria | Tecnologia |
 |---|---|
 | Runtime | Node.js 22 |
-| Language | TypeScript |
-| HTTP Framework | Express 5 |
-| Validation | Zod 4 |
-| Database | PostgreSQL 18 |
+| Linguagem | TypeScript |
+| Framework HTTP | Express 5 |
+| Validação | Zod 4 |
+| Banco de dados | PostgreSQL 18 |
 | ORM | Drizzle ORM |
-| Database Driver | node-postgres (`pg`) |
-| Password Hashing | Argon2id |
-| Testing | Vitest, Supertest, Testcontainers |
-| Cloud Runtime | AWS Lambda |
+| Driver PostgreSQL | node-postgres (`pg`) |
+| Hash de senhas | Argon2id |
+| Testes | Vitest, Supertest e Testcontainers |
+| Execução em nuvem | AWS Lambda |
 | API Gateway | Amazon API Gateway HTTP API |
-| Rate Limiting | Amazon DynamoDB |
-| Secrets Management | AWS Secrets Manager |
-| Infrastructure as Code | Terraform |
+| Limitação de requisições | Amazon DynamoDB |
+| Gerenciamento de segredos | AWS Secrets Manager |
+| Infraestrutura como código | Terraform |
 | CI/CD | GitHub Actions |
-| Cloud Authentication | AWS IAM OIDC |
+| Autenticação da CI/CD na AWS | AWS IAM OIDC |
+| Serviço de e-mail | Resend |
 
-## Getting Started
+## Começando
 
-### Prerequisites
+### Pré-requisitos
 
-For local application development:
-
-- Node.js 22 or later
+- Node.js 22 ou superior
 - npm
 - GNU Make
-- Docker (required for integration tests)
-- A PostgreSQL database
+- Docker, necessário para os testes de integração
+- Banco de dados PostgreSQL
 
-The project uses [Neon](https://neon.tech/) for PostgreSQL hosting, but any compatible PostgreSQL instance can be used for local development.
+O projeto utiliza Neon para hospedagem do PostgreSQL, mas qualquer instância compatível pode ser utilizada no desenvolvimento local.
 
-### 1. Clone the repository
+### 1. Clonar o repositório
 
 ```bash
 git clone https://github.com/ffakira/orbis.git
 cd orbis
 ```
 
-### 2. Install dependencies
+### 2. Instalar dependências
 
 ```bash
 make install
 ```
 
-This runs `npm ci` and installs the dependencies defined in `package-lock.json`.
+O comando executa `npm ci` e instala as dependências definidas em `package-lock.json`.
 
-### 3. Configure environment variables
+### 3. Configurar variáveis de ambiente
 
-Create your local environment file:
+Crie o arquivo local:
 
 ```bash
 cp .env.example .env
 ```
 
-Configure the database connection and Terms of Service version in `.env`:
+Configure a conexão com o banco e a versão dos Termos de Serviço:
 
 ```dotenv
 NODE_ENV=development
 PORT=3000
 LOG_LEVEL=debug
 
-DATABASE_URL=postgresql://<user>:<password>@<host>/<database>?sslmode=require
+DATABASE_URL=postgresql://<usuario>:<senha>@<host>/<banco>?sslmode=require
 
 TERMS_OF_SERVICE_VERSION=1.0
 ```
 
-Replace the database placeholders with your PostgreSQL connection details.
+Substitua os valores de exemplo pelas configurações do seu ambiente.
 
-`TERMS_OF_SERVICE_VERSION` identifies the published Terms of Service version recorded during registration.
+Para executar migrações com uma conexão separada, configure opcionalmente `MIGRATION_DATABASE_URL`. Se ela não estiver definida, as migrações utilizarão `DATABASE_URL`.
 
-For database migrations, `MIGRATION_DATABASE_URL` can optionally be configured to use a separate database connection:
+Nunca versione o arquivo `.env` nem inclua credenciais no código-fonte.
 
-```dotenv
-MIGRATION_DATABASE_URL=postgresql://<user>:<password>@<host>/<database>?sslmode=require
-```
+### 4. Executar migrações
 
-When omitted, migrations use `DATABASE_URL`.
-
-**Never commit `.env` or place database credentials in source code.**
-
-### 4. Run database migrations
-
-Generate migrations only after intentional database schema changes:
+Gerar migrações após alterações intencionais no esquema:
 
 ```bash
 npm run db:generate
 ```
 
-Apply existing migrations:
+Aplicar as migrações existentes:
 
 ```bash
 npm run db:migrate
 ```
 
-### 5. Start the development server
+### 5. Iniciar o servidor
 
 ```bash
 make dev
 ```
 
-The API will be available at:
+A API ficará disponível em `http://localhost:3000`.
 
-```text
-http://localhost:3000
-```
+## Endpoints
 
-## API Endpoints
-
-| Method | Endpoint | Description |
+| Método | Endpoint | Descrição |
 |---|---|---|
-| GET | `/health` | Application health check |
-| GET | `/ready` | Database readiness check |
-| POST | `/identity/register` | Register a new account |
+| GET | `/health` | Verifica se a aplicação está respondendo |
+| GET | `/ready` | Verifica a conectividade com o banco |
+| POST | `/identity/register` | Cadastra uma conta |
+| POST | `/identity/login` | Autentica uma conta |
+| POST | `/identity/verify-email` | Confirma o endereço de e-mail |
+| GET | `/identity/me` | Consulta o perfil do usuário autenticado |
 
-### Health checks
+O endpoint `/identity/me` exige um token de acesso no formato Bearer.
 
-```bash
-curl -i http://localhost:3000/health
-```
+## Desenvolvimento
 
-```bash
-curl -i http://localhost:3000/ready
-```
+### Comandos disponíveis
 
-`/health` verifies that the application is responding.
-
-`/ready` verifies database connectivity.
-
-### Account registration
-
-```bash
-curl -i -X POST http://localhost:3000/identity/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "firstName": "Test",
-    "lastName": "User",
-    "email": "test@example.com",
-    "phone": "+15555550100",
-    "password": "synthetic-test-password",
-    "acceptTerms": true
-  }'
-```
-
-The request is validated using Zod before the registration use case executes.
-
-## Development
-
-### Available commands
-
-| Command | Description |
+| Comando | Descrição |
 |---|---|
-| `make` | Display available commands |
-| `make install` | Install dependencies |
-| `make dev` | Start the development server |
-| `make test` | Run the test suite |
-| `make build` | Compile TypeScript |
-| `make package` | Build the AWS Lambda deployment package |
-| `make clean` | Remove generated build artifacts |
-| `make health` | Check the deployed API health endpoint |
-| `make ready` | Check deployed API and database readiness |
-| `make check` | Run both deployed health checks |
+| `make` | Exibe os comandos disponíveis |
+| `make install` | Instala as dependências |
+| `make dev` | Inicia o servidor de desenvolvimento |
+| `make test` | Executa a suíte de testes |
+| `make build` | Compila o TypeScript |
+| `make package` | Gera o pacote de implantação da Lambda |
+| `make clean` | Remove artefatos gerados |
+| `make health` | Verifica o endpoint de saúde implantado |
+| `make ready` | Verifica a API e a conexão com o banco |
+| `make check` | Executa as duas verificações |
 
-Database commands:
+Comandos do banco:
 
-| Command | Description |
+| Comando | Descrição |
 |---|---|
-| `npm run db:generate` | Generate database migrations |
-| `npm run db:migrate` | Apply database migrations |
-| `npm run db:studio` | Open Drizzle Studio |
+| `npm run db:generate` | Gera migrações |
+| `npm run db:migrate` | Aplica migrações |
+| `npm run db:studio` | Abre o Drizzle Studio |
 
-### Run tests
-
-```bash
-make test
-```
-
-Integration tests use Testcontainers to provision disposable PostgreSQL instances. Docker must be running.
-
-Never run automated integration tests against production databases.
-
-### Build
-
-```bash
-make build
-```
-
-Before submitting changes, run:
+### Testes e compilação
 
 ```bash
 make test
 make build
 ```
 
-## Architecture
+Os testes de integração utilizam Testcontainers para provisionar instâncias PostgreSQL descartáveis. O Docker precisa estar em execução.
 
-Orbis follows **Hexagonal Architecture (Ports and Adapters)**, keeping business rules independent from delivery mechanisms and infrastructure implementations.
+Nunca execute testes automatizados de integração contra bancos de produção.
 
-The application is organised around business capabilities. Each module owns its domain, application logic and module-specific infrastructure adapters.
+## Arquitetura
 
-The main architectural boundaries are:
+A aplicação segue Arquitetura Hexagonal, mantendo as regras de negócio independentes dos mecanismos de entrega, frameworks e implementações de infraestrutura.
 
-- **Bootstrap:** composition roots and dependency wiring.
-- **Delivery:** HTTP and other external entry points.
-- **Modules:** business capabilities, including Domain, Application and module-owned Infrastructure.
-- **Infrastructure:** shared technical capabilities such as database connectivity, secrets and external integrations.
+As principais fronteiras são:
 
-The application uses the same Express instance for local development and AWS Lambda execution.
+- **Bootstrap:** composição de dependências e inicialização dos componentes.
+- **Delivery:** pontos de entrada HTTP e outros mecanismos de entrega.
+- **Modules:** capacidades de negócio, cada uma com seu domínio, aplicação e infraestrutura específica.
+- **Infrastructure:** recursos técnicos compartilhados, como conexão com banco, segredos e integrações externas.
 
-See [Architecture Documentation](docs/architecture.md) for the architecture diagrams, module structure and registration flow.
+Documentação específica:
 
-## AWS Deployment
+- [Arquitetura](docs/architecture.md)
+- [Identity](docs/identity.md)
+- [Outbox](docs/outbox.md)
+- [Implantação e infraestrutura](docs/deployment.md)
 
-Production infrastructure is managed through Terraform and includes:
+## Escopo implementado
 
-- Amazon API Gateway HTTP API.
-- AWS Lambda running Node.js 22.
-- Amazon DynamoDB for registration rate limiting.
-- AWS Secrets Manager.
-- Parameters and Secrets Lambda Extension.
-- Amazon S3 for Terraform remote state.
-- CloudWatch Logs.
+A implementação atual inclui:
 
-Production deployments are initiated manually through GitHub Actions using AWS IAM OIDC federation.
+- Arquitetura modular baseada em portas e adaptadores.
+- Cadastro de usuários.
+- Normalização e unicidade de e-mail.
+- Hash de senha com Argon2id.
+- Registro transacional do aceite dos Termos de Serviço.
+- Emissão e verificação de tokens de acesso.
+- Verificação de endereço de e-mail.
+- Verificação do estado atual da conta em rotas autenticadas.
+- Persistência PostgreSQL com Drizzle ORM.
+- Outbox transacional e processamento assíncrono.
+- Entrega de e-mails por meio do Resend.
+- Testes unitários e de integração com PostgreSQL descartável.
+- Execução em AWS Lambda e integração com API Gateway.
+- Limitação de requisições de cadastro com DynamoDB.
+- Gerenciamento de segredos com AWS Secrets Manager.
+- Infraestrutura gerenciada com Terraform.
+- CI/CD com GitHub Actions e AWS OIDC.
+- Aprovação antes da implantação em produção e verificações posteriores à implantação.
 
-The production workflow separates Terraform planning and application, with an approval requirement before applying infrastructure changes.
+O escopo de negócio continua em evolução. Consulte os documentos dos módulos para conhecer os fluxos implementados e seus limites atuais.
 
-See [Deployment Documentation](docs/deployment.md) for AWS configuration, Terraform operations, secrets management and production deployment instructions.
+## Licença
 
-## Current Implementation Scope
-
-The current implementation provides the foundation for the Orbis API and the Identity registration flow.
-
-Implemented capabilities include:
-
-- Modular application architecture.
-- User registration.
-- Email normalization and uniqueness enforcement.
-- Argon2id password hashing.
-- Server-controlled Terms of Service acceptance.
-- Transactional persistence of users, terms acceptance and outbox events.
-- PostgreSQL persistence through Drizzle ORM.
-- Integration testing with Testcontainers.
-- Express HTTP delivery.
-- AWS Lambda deployment.
-- API Gateway integration.
-- DynamoDB registration rate-limiting infrastructure.
-- AWS Secrets Manager integration.
-- Terraform-managed infrastructure.
-- GitHub Actions CI/CD with AWS OIDC.
-- Production deployment approval and post-deployment health checks.
-
-The transactional outbox currently guarantees durable event persistence within the business transaction. Background dispatch and external event publishing remain future work.
-
-## Documentation
-
-- [Architecture](docs/architecture.md)
-- [Deployment and Infrastructure](docs/deployment.md)
-
-## Licence
-
-No licence has been selected for this repository yet.
+Ainda não foi definida uma licença para este repositório.
