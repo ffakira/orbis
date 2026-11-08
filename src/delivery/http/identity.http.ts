@@ -51,7 +51,7 @@ export interface UserProfileHandlerContract {
 }
 
 export interface ActiveUserHandlerContract {
-  execute(userId: string): Promise<void>;
+  execute(userId: string, tokenVersion: number): Promise<void>;
 }
 
 export interface RequestPasswordRecoveryHandlerContract {

@@ -14,6 +14,7 @@ function createTransaction(
     userId: string;
     passwordHash: string;
     status: "active" | "pending_email_verification" | "suspended";
+    tokenVersion: number;
   } | null,
 ) {
   const insertedTokens: unknown[] = [];
@@ -23,7 +24,7 @@ function createTransaction(
     users: {
       insert: vi.fn(async () => {}),
       activate: vi.fn(async () => true),
-      updatePassword: vi.fn(async () => true),
+      resetPassword: vi.fn(async () => true),
     },
 
     authenticationUsers: {
@@ -111,6 +112,7 @@ describe("RequestPasswordRecoveryHandler", () => {
       userId,
       passwordHash: "$argon2id$synthetic-hash",
       status: "active",
+      tokenVersion: 0,
     });
 
     const { handler, deriveToken, hashToken, clockNow, transactionSpy } =
@@ -177,6 +179,7 @@ describe("RequestPasswordRecoveryHandler", () => {
         userId,
         passwordHash: "$argon2id$synthetic-hash",
         status: "pending_email_verification" as const,
+        tokenVersion: 0,
       },
     ],
     [
@@ -185,6 +188,7 @@ describe("RequestPasswordRecoveryHandler", () => {
         userId,
         passwordHash: "$argon2id$synthetic-hash",
         status: "suspended" as const,
+        tokenVersion: 0,
       },
     ],
   ])("returns the same result for an %s", async (_description, user) => {

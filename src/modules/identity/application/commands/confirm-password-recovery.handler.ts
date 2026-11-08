@@ -42,7 +42,7 @@ export class ConfirmPasswordRecoveryHandler {
         throw new InvalidPasswordResetTokenError();
       }
 
-      const updated = await transaction.users.updatePassword(
+      const updated = await transaction.users.resetPassword(
         userId,
         passwordHash,
         consumedAt,

@@ -3,7 +3,10 @@ import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
 import { createRequireAuthentication } from "#delivery/http/middleware/require-authentication.js";
-import { InactiveUserError } from "#modules/identity/application/queries/get-active-user.handler.js";
+import {
+  InactiveUserError,
+  InvalidTokenVersionError,
+} from "#modules/identity/application/queries/get-active-user.handler.js";
 import { InvalidAccessTokenError } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
 
 import type {
@@ -13,13 +16,16 @@ import type {
 
 const authenticatedUser: VerifiedAccessToken = {
   userId: "00000000-0000-4000-8000-000000000001",
+  tokenVersion: 0,
   issuedAt: new Date("2026-11-07T12:00:00.000Z"),
   expiresAt: new Date("2026-11-07T12:15:00.000Z"),
 };
 
 function createApp(
   verifier: AccessTokenVerifier,
-  executeActiveUser = vi.fn(async (_userId: string): Promise<void> => {}),
+  executeActiveUser = vi.fn(
+    async (_userId: string, _tokenVersion: number): Promise<void> => {},
+  ),
 ) {
   const app = express();
 
@@ -97,6 +103,7 @@ describe("require authentication middleware", () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       userId: authenticatedUser.userId,
+      tokenVersion: authenticatedUser.tokenVersion,
       issuedAt: authenticatedUser.issuedAt.toISOString(),
       expiresAt: authenticatedUser.expiresAt.toISOString(),
     });
@@ -106,7 +113,10 @@ describe("require authentication middleware", () => {
 
     expect(getActiveUserHandler).toHaveBeenCalledOnce();
     expect(executeActiveUser).toHaveBeenCalledOnce();
-    expect(executeActiveUser).toHaveBeenCalledWith(authenticatedUser.userId);
+    expect(executeActiveUser).toHaveBeenCalledWith(
+      authenticatedUser.userId,
+      authenticatedUser.tokenVersion,
+    );
   });
 
   it("rejects inactive users", async () => {
@@ -129,7 +139,35 @@ describe("require authentication middleware", () => {
     });
 
     expect(verify).toHaveBeenCalledOnce();
-    expect(executeActiveUser).toHaveBeenCalledWith(authenticatedUser.userId);
+    expect(executeActiveUser).toHaveBeenCalledWith(
+      authenticatedUser.userId,
+      authenticatedUser.tokenVersion,
+    );
+  });
+
+  it("rejects tokens with an invalidated token version", async () => {
+    const verify = vi.fn().mockResolvedValue(authenticatedUser);
+
+    const executeActiveUser = vi
+      .fn()
+      .mockRejectedValue(new InvalidTokenVersionError());
+
+    const { app } = createApp({ verify }, executeActiveUser);
+
+    const response = await request(app)
+      .get("/protected")
+      .set("Authorization", "Bearer valid-access-token");
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({
+      error: "UNAUTHENTICATED",
+      message: "Authentication is required.",
+    });
+
+    expect(executeActiveUser).toHaveBeenCalledWith(
+      authenticatedUser.userId,
+      authenticatedUser.tokenVersion,
+    );
   });
 
   it("rejects invalid access tokens", async () => {
@@ -187,6 +225,9 @@ describe("require authentication middleware", () => {
       error: "INTERNAL_SERVER_ERROR",
     });
 
-    expect(executeActiveUser).toHaveBeenCalledWith(authenticatedUser.userId);
+    expect(executeActiveUser).toHaveBeenCalledWith(
+      authenticatedUser.userId,
+      authenticatedUser.tokenVersion,
+    );
   });
 });

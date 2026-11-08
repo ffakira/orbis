@@ -80,6 +80,7 @@ describe("DrizzleAuthenticationUserRepository", () => {
       userId: "00000000-0000-4000-8000-000000000001",
       passwordHash: "$argon2id$synthetic-test-hash",
       status: "active",
+      tokenVersion: 0,
     });
   });
 

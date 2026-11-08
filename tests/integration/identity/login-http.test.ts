@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "#delivery/http/app.js";
 import { InvalidCredentialsError } from "#modules/identity/application/commands/login.handler.js";
+import { InactiveUserError } from "#modules/identity/application/queries/get-active-user.handler.js";
 import { InvalidAccessTokenError } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
 
 import type { LoginResult } from "#modules/identity/application/commands/login.handler.js";
@@ -30,6 +31,8 @@ const userProfile: UserProfile = {
   createdAt: new Date("2026-01-15T10:00:00.000Z"),
 };
 
+const tokenVersion = 0;
+
 function createTestApp() {
   const loginExecute = vi.fn(
     async (_command: LoginCommand): Promise<LoginResult> => loginResult,
@@ -54,6 +57,7 @@ function createTestApp() {
 
     return {
       userId: userProfile.userId,
+      tokenVersion,
       issuedAt: new Date("2026-01-15T10:00:00.000Z"),
       expiresAt: new Date("2026-01-15T10:15:00.000Z"),
     };
@@ -63,7 +67,9 @@ function createTestApp() {
     verify: verifyToken,
   }));
 
-  const activeUserExecute = vi.fn(async (_userId: string) => {});
+  const activeUserExecute = vi.fn(
+    async (_userId: string, _tokenVersion: number) => {},
+  );
 
   const getActiveUserHandler = vi.fn(async () => ({
     execute: activeUserExecute,
@@ -87,6 +93,12 @@ function createTestApp() {
     })),
   }));
 
+  const getConfirmPasswordRecoveryHandler = vi.fn(async () => ({
+    execute: vi.fn(async () => ({
+      passwordReset: true as const,
+    })),
+  }));
+
   const checkDatabaseReadiness = vi.fn(async () => ({
     database: "test_database",
     username: "test_user",
@@ -102,6 +114,7 @@ function createTestApp() {
       getUserProfileHandler,
       getActiveUserHandler,
       getRequestPasswordRecoveryHandler,
+      getConfirmPasswordRecoveryHandler,
     },
     checkDatabaseReadiness,
   });
@@ -230,7 +243,10 @@ describe("GET /identity/me", () => {
     expect(verifyToken).toHaveBeenCalledWith("synthetic-valid-access-token");
 
     expect(activeUserExecute).toHaveBeenCalledOnce();
-    expect(activeUserExecute).toHaveBeenCalledWith(userProfile.userId);
+    expect(activeUserExecute).toHaveBeenCalledWith(
+      userProfile.userId,
+      tokenVersion,
+    );
 
     expect(getUserProfileHandler).toHaveBeenCalledOnce();
     expect(profileExecute).toHaveBeenCalledWith(userProfile.userId);
@@ -263,13 +279,14 @@ describe("GET /identity/me", () => {
   it("returns 401 when the authenticated user is inactive", async () => {
     const { app, activeUserExecute, getUserProfileHandler } = createTestApp();
 
-    activeUserExecute.mockRejectedValue(new Error("User is inactive."));
+    activeUserExecute.mockRejectedValue(new InactiveUserError());
 
     const response = await request(app)
       .get("/identity/me")
       .set("Authorization", "Bearer synthetic-valid-access-token");
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBe("UNAUTHENTICATED");
     expect(getUserProfileHandler).not.toHaveBeenCalled();
   });
 });

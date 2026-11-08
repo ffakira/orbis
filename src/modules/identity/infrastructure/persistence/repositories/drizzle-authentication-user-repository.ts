@@ -20,6 +20,7 @@ export class DrizzleAuthenticationUserRepository implements AuthenticationUserRe
         userId: users.id,
         passwordHash: users.passwordHash,
         status: users.status,
+        tokenVersion: users.tokenVersion,
       })
       .from(users)
       .where(eq(users.email, email.value))

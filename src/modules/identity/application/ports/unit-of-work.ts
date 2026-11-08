@@ -9,7 +9,7 @@ export interface IdentityTransaction {
   users: {
     insert(user: User): Promise<void>;
     activate(userId: string, activatedAt: Date): Promise<boolean>;
-    updatePassword(
+    resetPassword(
       userId: string,
       passwordHash: string,
       updatedAt: Date,

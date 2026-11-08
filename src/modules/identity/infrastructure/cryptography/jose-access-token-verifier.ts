@@ -37,6 +37,9 @@ export class JoseAccessTokenVerifier implements AccessTokenVerifier {
 
       if (
         typeof payload.sub !== "string" ||
+        typeof payload.tokenVersion !== "number" ||
+        !Number.isSafeInteger(payload.tokenVersion) ||
+        payload.tokenVersion < 0 ||
         typeof payload.iat !== "number" ||
         typeof payload.exp !== "number"
       ) {
@@ -45,6 +48,7 @@ export class JoseAccessTokenVerifier implements AccessTokenVerifier {
 
       return {
         userId: payload.sub,
+        tokenVersion: payload.tokenVersion,
         issuedAt: new Date(payload.iat * 1000),
         expiresAt: new Date(payload.exp * 1000),
       };

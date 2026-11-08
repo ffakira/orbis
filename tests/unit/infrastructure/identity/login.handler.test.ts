@@ -17,6 +17,7 @@ const user = {
   userId: "00000000-0000-4000-8000-000000000001",
   passwordHash: "synthetic-password-hash",
   status: "active" as const,
+  tokenVersion: 0,
 };
 
 describe("LoginHandler", () => {
@@ -76,7 +77,11 @@ describe("LoginHandler", () => {
       "correct-password",
       user.passwordHash,
     );
-    expect(accessTokenIssuer.issue).toHaveBeenCalledWith(user.userId, issuedAt);
+    expect(accessTokenIssuer.issue).toHaveBeenCalledWith(
+      user.userId,
+      user.tokenVersion,
+      issuedAt,
+    );
 
     expect(result).toEqual({
       accessToken: "synthetic-access-token",

@@ -390,7 +390,7 @@ describe("DrizzleIdentityUnitOfWork", () => {
     expect(persistedToken?.consumedAt).toBeNull();
   });
 
-  it("updates the user's password within the identity transaction", async () => {
+  it("resets the user's password and increments token version within the identity transaction", async () => {
     const registration = createRegistration(
       "00000000-0000-4000-8000-000000000091",
       "00000000-0000-4000-8000-000000000092",
@@ -404,7 +404,7 @@ describe("DrizzleIdentityUnitOfWork", () => {
     await unitOfWork.transaction(async (transaction) => {
       await transaction.users.insert(registration.user);
 
-      const updated = await transaction.users.updatePassword(
+      const updated = await transaction.users.resetPassword(
         registration.user.id,
         newPasswordHash,
         updatedAt,
@@ -417,9 +417,10 @@ describe("DrizzleIdentityUnitOfWork", () => {
 
     expect(persistedUser?.passwordHash).toBe(newPasswordHash);
     expect(persistedUser?.updatedAt).toEqual(updatedAt);
+    expect(persistedUser?.tokenVersion).toBe(1);
   });
 
-  it("rolls back the password update when a later transaction operation fails", async () => {
+  it("rolls back the password and token version updates when a later transaction operation fails", async () => {
     const registration = createRegistration(
       "00000000-0000-4000-8000-000000000101",
       "00000000-0000-4000-8000-000000000102",
@@ -436,7 +437,7 @@ describe("DrizzleIdentityUnitOfWork", () => {
 
     await expect(
       unitOfWork.transaction(async (transaction) => {
-        const updated = await transaction.users.updatePassword(
+        const updated = await transaction.users.resetPassword(
           registration.user.id,
           newPasswordHash,
           updatedAt,
@@ -451,6 +452,7 @@ describe("DrizzleIdentityUnitOfWork", () => {
     const [persistedUser] = await db.select().from(users);
 
     expect(persistedUser?.passwordHash).toBe(registration.user.passwordHash);
+    expect(persistedUser?.tokenVersion).toBe(0);
     expect(persistedUser?.updatedAt).not.toEqual(updatedAt);
   });
 });

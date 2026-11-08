@@ -7,6 +7,13 @@ export class InactiveUserError extends Error {
   }
 }
 
+export class InvalidTokenVersionError extends Error {
+  constructor() {
+    super("The access token has been invalidated.");
+    this.name = "InvalidTokenVersionError";
+  }
+}
+
 export interface GetActiveUserHandlerDependencies {
   activeUsers: ActiveUserRepository;
 }
@@ -16,11 +23,15 @@ export class GetActiveUserHandler {
     private readonly dependencies: GetActiveUserHandlerDependencies,
   ) {}
 
-  async execute(userId: string): Promise<void> {
-    const status = await this.dependencies.activeUsers.findStatusById(userId);
+  async execute(userId: string, tokenVersion: number): Promise<void> {
+    const user = await this.dependencies.activeUsers.findById(userId);
 
-    if (status !== "active") {
+    if (user?.status !== "active") {
       throw new InactiveUserError();
+    }
+
+    if (user.tokenVersion !== tokenVersion) {
+      throw new InvalidTokenVersionError();
     }
   }
 }

@@ -9,12 +9,13 @@ const secret = new TextEncoder().encode(
 
 const issuedAt = new Date("2026-11-07T12:00:00.000Z");
 const userId = "00000000-0000-4000-8000-000000000001";
+const tokenVersion = 0;
 
 describe("JoseAccessTokenIssuer", () => {
   it("issues a signed HS256 access token with the expected claims", async () => {
     const issuer = new JoseAccessTokenIssuer(secret);
 
-    const token = await issuer.issue(userId, issuedAt);
+    const token = await issuer.issue(userId, tokenVersion, issuedAt);
 
     const verified = await jwtVerify(token.value, secret, {
       algorithms: ["HS256"],
@@ -29,6 +30,7 @@ describe("JoseAccessTokenIssuer", () => {
     });
 
     expect(verified.payload.sub).toBe(userId);
+    expect(verified.payload.tokenVersion).toBe(tokenVersion);
     expect(verified.payload.iss).toBe("orbis");
     expect(verified.payload.aud).toBe("orbis-api");
     expect(verified.payload.iat).toBe(Math.floor(issuedAt.getTime() / 1000));
@@ -49,7 +51,7 @@ describe("JoseAccessTokenIssuer", () => {
 
   it("does not issue a token that can be verified with another secret", async () => {
     const issuer = new JoseAccessTokenIssuer(secret);
-    const token = await issuer.issue(userId, issuedAt);
+    const token = await issuer.issue(userId, tokenVersion, issuedAt);
 
     const differentSecret = new TextEncoder().encode(
       "another-synthetic-secret-with-at-least-32-bytes",

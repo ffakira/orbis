@@ -36,6 +36,13 @@
       "when": 1794145892700,
       "tag": "0004_lumpy_penance",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794154845147,
+      "tag": "0005_magical_ultimatum",
+      "breakpoints": true
     }
   ]
 }

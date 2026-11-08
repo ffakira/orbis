@@ -29,6 +29,8 @@ export const users = pgTable("users", {
 
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
 
+  tokenVersion: integer("token_version").notNull().default(0),
+
   status: userStatus("status").notNull().default("pending_email_verification"),
 
   createdAt: timestamp("created_at", {

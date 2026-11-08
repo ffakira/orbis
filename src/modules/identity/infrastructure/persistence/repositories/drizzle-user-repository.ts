@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { DatabaseExecutor } from "#infrastructure/database/client.js";
 import { users } from "#infrastructure/database/schema/identity.schema.js";
@@ -83,7 +83,7 @@ export class DrizzleUserRepository {
     return activatedUser !== undefined;
   }
 
-  async updatePassword(
+  async resetPassword(
     userId: string,
     passwordHash: string,
     updatedAt: Date,
@@ -93,6 +93,7 @@ export class DrizzleUserRepository {
       .set({
         passwordHash,
         updatedAt,
+        tokenVersion: sql`${users.tokenVersion} + 1`,
       })
       .where(eq(users.id, userId))
       .returning({

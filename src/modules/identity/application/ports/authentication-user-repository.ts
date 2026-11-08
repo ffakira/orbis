@@ -5,6 +5,7 @@ export interface AuthenticationUser {
   userId: string;
   passwordHash: string;
   status: UserStatus;
+  tokenVersion: number;
 }
 
 export interface AuthenticationUserRepository {

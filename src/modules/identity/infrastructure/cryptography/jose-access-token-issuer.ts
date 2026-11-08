@@ -21,13 +21,19 @@ export class JoseAccessTokenIssuer implements AccessTokenIssuer {
     this.secret = new Uint8Array(secret);
   }
 
-  async issue(userId: string, issuedAt: Date): Promise<AccessToken> {
+  async issue(
+    userId: string,
+    tokenVersion: number,
+    issuedAt: Date,
+  ): Promise<AccessToken> {
     const issuedAtSeconds = Math.floor(issuedAt.getTime() / 1000);
     const expiresAt = new Date(
       (issuedAtSeconds + ACCESS_TOKEN_TTL_SECONDS) * 1000,
     );
 
-    const value = await new SignJWT({})
+    const value = await new SignJWT({
+      tokenVersion,
+    })
       .setProtectedHeader({ alg: JWT_ALGORITHM, typ: "JWT" })
       .setIssuer(JWT_ISSUER)
       .setAudience(JWT_AUDIENCE)

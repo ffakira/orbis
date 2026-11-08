@@ -1,5 +1,6 @@
 export interface VerifiedAccessToken {
   userId: string;
+  tokenVersion: number;
   issuedAt: Date;
   expiresAt: Date;
 }

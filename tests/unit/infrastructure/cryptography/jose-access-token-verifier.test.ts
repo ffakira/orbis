@@ -12,6 +12,7 @@ const secret = new TextEncoder().encode(
 
 const issuedAt = new Date("2026-11-07T12:00:00.000Z");
 const userId = "00000000-0000-4000-8000-000000000001";
+const tokenVersion = 0;
 
 async function createToken(
   signingSecret: Uint8Array = secret,
@@ -19,13 +20,15 @@ async function createToken(
     issuer?: string;
     audience?: string;
     subject?: string;
+    tokenVersion?: number;
     issuedAt?: number;
     expiresAt?: number;
   } = {},
 ): Promise<string> {
   const issuedAtSeconds = Math.floor(issuedAt.getTime() / 1000);
+  const version = options.tokenVersion ?? tokenVersion;
 
-  return new SignJWT({})
+  return new SignJWT({ tokenVersion: version })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setIssuer(options.issuer ?? "orbis")
     .setAudience(options.audience ?? "orbis-api")
@@ -49,6 +52,7 @@ describe("JoseAccessTokenVerifier", () => {
 
     expect(result).toEqual({
       userId,
+      tokenVersion,
       issuedAt: new Date(now * 1000),
       expiresAt: new Date((now + 900) * 1000),
     });
@@ -106,6 +110,23 @@ describe("JoseAccessTokenVerifier", () => {
     const token = await createToken(secret, {
       audience: "another-api",
     });
+
+    await expect(verifier.verify(token)).rejects.toBeInstanceOf(
+      InvalidAccessTokenError,
+    );
+  });
+
+  it("rejects tokens without a valid token version", async () => {
+    const verifier = new JoseAccessTokenVerifier(secret);
+
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setIssuer("orbis")
+      .setAudience("orbis-api")
+      .setSubject(userId)
+      .setIssuedAt()
+      .setExpirationTime("15m")
+      .sign(secret);
 
     await expect(verifier.verify(token)).rejects.toBeInstanceOf(
       InvalidAccessTokenError,

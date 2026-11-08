@@ -50,7 +50,11 @@ export class LoginHandler {
     }
 
     const issuedAt = clock.now();
-    const token = await accessTokenIssuer.issue(user.userId, issuedAt);
+    const token = await accessTokenIssuer.issue(
+      user.userId,
+      user.tokenVersion,
+      issuedAt,
+    );
 
     return {
       accessToken: token.value,

@@ -1,4 +1,7 @@
-import { InactiveUserError } from "#modules/identity/application/queries/get-active-user.handler.js";
+import {
+  InactiveUserError,
+  InvalidTokenVersionError,
+} from "#modules/identity/application/queries/get-active-user.handler.js";
 import { InvalidAccessTokenError } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
 
 import type {
@@ -10,7 +13,7 @@ import type { RequestHandler } from "express";
 export interface AuthenticationMiddlewareDependencies {
   getAccessTokenVerifier: () => Promise<AccessTokenVerifier>;
   getActiveUserHandler: () => Promise<{
-    execute(userId: string): Promise<void>;
+    execute(userId: string, tokenVersion: number): Promise<void>;
   }>;
 }
 
@@ -45,7 +48,10 @@ export function createRequireAuthentication(
       const authenticatedUser = await verifier.verify(match[1]);
 
       const activeUserHandler = await dependencies.getActiveUserHandler();
-      await activeUserHandler.execute(authenticatedUser.userId);
+      await activeUserHandler.execute(
+        authenticatedUser.userId,
+        authenticatedUser.tokenVersion,
+      );
 
       res.locals.auth = authenticatedUser;
 
@@ -53,7 +59,8 @@ export function createRequireAuthentication(
     } catch (error) {
       if (
         error instanceof InvalidAccessTokenError ||
-        error instanceof InactiveUserError
+        error instanceof InactiveUserError ||
+        error instanceof InvalidTokenVersionError
       ) {
         return res.status(401).json({
           error: "UNAUTHENTICATED",

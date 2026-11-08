@@ -1,5 +1,10 @@
 import type { UserStatus } from "#modules/identity/domain/user.js";
 
+export interface ActiveUser {
+  status: UserStatus;
+  tokenVersion: number;
+}
+
 export interface ActiveUserRepository {
-  findStatusById(userId: string): Promise<UserStatus | null>;
+  findById(userId: string): Promise<ActiveUser | null>;
 }

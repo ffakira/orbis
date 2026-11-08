@@ -21,7 +21,7 @@ function createTransaction(): IdentityTransaction {
     users: {
       insert: vi.fn(async () => {}),
       activate: vi.fn(async () => true),
-      updatePassword: vi.fn(async () => true),
+      resetPassword: vi.fn(async () => true),
     },
 
     authenticationUsers: {
@@ -119,8 +119,8 @@ describe("ConfirmPasswordRecoveryHandler", () => {
       consumedAt,
     );
 
-    expect(transaction.users.updatePassword).toHaveBeenCalledOnce();
-    expect(transaction.users.updatePassword).toHaveBeenCalledWith(
+    expect(transaction.users.resetPassword).toHaveBeenCalledOnce();
+    expect(transaction.users.resetPassword).toHaveBeenCalledWith(
       userId,
       passwordHash,
       consumedAt,
@@ -145,13 +145,13 @@ describe("ConfirmPasswordRecoveryHandler", () => {
       consumedAt,
     );
 
-    expect(transaction.users.updatePassword).not.toHaveBeenCalled();
+    expect(transaction.users.resetPassword).not.toHaveBeenCalled();
   });
 
   it("rejects the reset when the user password cannot be updated", async () => {
     const transaction = createTransaction();
 
-    vi.mocked(transaction.users.updatePassword).mockResolvedValue(false);
+    vi.mocked(transaction.users.resetPassword).mockResolvedValue(false);
 
     const { handler } = createHandler(transaction);
 
@@ -161,7 +161,7 @@ describe("ConfirmPasswordRecoveryHandler", () => {
 
     expect(transaction.passwordResetTokens.consume).toHaveBeenCalledOnce();
 
-    expect(transaction.users.updatePassword).toHaveBeenCalledWith(
+    expect(transaction.users.resetPassword).toHaveBeenCalledWith(
       userId,
       passwordHash,
       consumedAt,

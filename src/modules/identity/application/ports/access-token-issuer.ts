@@ -4,5 +4,9 @@ export interface AccessToken {
 }
 
 export interface AccessTokenIssuer {
-  issue(userId: string, issuedAt: Date): Promise<AccessToken>;
+  issue(
+    userId: string,
+    tokenVersion: number,
+    issuedAt: Date,
+  ): Promise<AccessToken>;
 }
