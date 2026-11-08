@@ -29,6 +29,13 @@
       "when": 1794080923724,
       "tag": "0003_fine_smiling_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794145892700,
+      "tag": "0004_lumpy_penance",
+      "breakpoints": true
     }
   ]
 }

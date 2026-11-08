@@ -1,8 +1,9 @@
 import { DrizzleAuthenticationUserRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-authentication-user-repository.js";
 import { DrizzleEmailVerificationTokenRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-email-verification-token-repository.js";
-import { DrizzleOutboxRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-outbox-repository.js";
+import { DrizzlePasswordResetTokenRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-password-reset-token-repository.js";
 import { DrizzleTermsAcceptanceRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-terms-acceptance-repository.js";
 import { DrizzleUserRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-user-repository.js";
+import { DrizzleOutboxRepository } from "#modules/outbox/infrastructure/persistence/drizzle-outbox-repository.js";
 
 import type { Database } from "#infrastructure/database/client.js";
 import type {
@@ -11,7 +12,11 @@ import type {
 } from "#modules/identity/application/ports/unit-of-work.js";
 
 export class DrizzleIdentityUnitOfWork implements IdentityUnitOfWork {
-  constructor(private readonly db: Database) {}
+  private readonly outboxRepository: DrizzleOutboxRepository;
+
+  constructor(private readonly db: Database) {
+    this.outboxRepository = new DrizzleOutboxRepository(db);
+  }
 
   async transaction<T>(
     operation: (transaction: IdentityTransaction) => Promise<T>,
@@ -24,7 +29,10 @@ export class DrizzleIdentityUnitOfWork implements IdentityUnitOfWork {
         emailVerificationTokens: new DrizzleEmailVerificationTokenRepository(
           tx,
         ),
-        outbox: new DrizzleOutboxRepository(tx),
+        passwordResetTokens: new DrizzlePasswordResetTokenRepository(tx),
+        outbox: {
+          append: (event) => this.outboxRepository.append(event, tx),
+        },
       };
 
       return operation(transaction);

@@ -4,7 +4,11 @@ import { and, asc, eq, isNull, lte, or, sql } from "drizzle-orm";
 
 import { outboxEvents } from "#infrastructure/database/schema/identity.schema.js";
 
-import type { Database } from "#infrastructure/database/client.js";
+import type {
+  Database,
+  DatabaseExecutor,
+} from "#infrastructure/database/client.js";
+import type { OutboxEvent } from "#modules/outbox/application/ports/outbox-event.js";
 import type {
   ClaimOutboxEventsInput,
   ClaimedOutboxEvent,
@@ -153,5 +157,24 @@ export class DrizzleOutboxRepository implements OutboxRepository {
     return failedEvent.attempts >= input.maxAttempts
       ? "dead_lettered"
       : "retry_scheduled";
+  }
+
+  async append(
+    event: OutboxEvent,
+    executor: DatabaseExecutor = this.db,
+  ): Promise<void> {
+    await executor.insert(outboxEvents).values({
+      id: event.id,
+      aggregateType: "user",
+      aggregateId: event.userId,
+      eventType: event.type,
+      payload: {
+        userId: event.userId,
+        tokenId: event.tokenId,
+        expiresAt: event.expiresAt,
+        occurredAt: event.occurredAt,
+      },
+      occurredAt: new Date(event.occurredAt),
+    });
   }
 }

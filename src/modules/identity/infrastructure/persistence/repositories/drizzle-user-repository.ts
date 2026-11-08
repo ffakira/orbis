@@ -82,4 +82,23 @@ export class DrizzleUserRepository {
 
     return activatedUser !== undefined;
   }
+
+  async updatePassword(
+    userId: string,
+    passwordHash: string,
+    updatedAt: Date,
+  ): Promise<boolean> {
+    const [updatedUser] = await this.db
+      .update(users)
+      .set({
+        passwordHash,
+        updatedAt,
+      })
+      .where(eq(users.id, userId))
+      .returning({
+        id: users.id,
+      });
+
+    return updatedUser !== undefined;
+  }
 }

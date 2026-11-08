@@ -113,6 +113,7 @@ describe("DrizzleIdentityUnitOfWork", () => {
       TRUNCATE TABLE
         outbox_events,
         email_verification_tokens,
+        password_reset_tokens,
         terms_acceptances,
         users
       CASCADE
@@ -387,5 +388,69 @@ describe("DrizzleIdentityUnitOfWork", () => {
 
     // The transaction rolled back, so the token remains unconsumed.
     expect(persistedToken?.consumedAt).toBeNull();
+  });
+
+  it("updates the user's password within the identity transaction", async () => {
+    const registration = createRegistration(
+      "00000000-0000-4000-8000-000000000091",
+      "00000000-0000-4000-8000-000000000092",
+      "00000000-0000-4000-8000-000000000093",
+      "password-update@example.com",
+    );
+
+    const updatedAt = new Date("2026-11-08T12:00:00.000Z");
+    const newPasswordHash = "$argon2id$synthetic-updated-test-hash";
+
+    await unitOfWork.transaction(async (transaction) => {
+      await transaction.users.insert(registration.user);
+
+      const updated = await transaction.users.updatePassword(
+        registration.user.id,
+        newPasswordHash,
+        updatedAt,
+      );
+
+      expect(updated).toBe(true);
+    });
+
+    const [persistedUser] = await db.select().from(users);
+
+    expect(persistedUser?.passwordHash).toBe(newPasswordHash);
+    expect(persistedUser?.updatedAt).toEqual(updatedAt);
+  });
+
+  it("rolls back the password update when a later transaction operation fails", async () => {
+    const registration = createRegistration(
+      "00000000-0000-4000-8000-000000000101",
+      "00000000-0000-4000-8000-000000000102",
+      "00000000-0000-4000-8000-000000000103",
+      "password-rollback@example.com",
+    );
+
+    const updatedAt = new Date("2026-11-08T12:00:00.000Z");
+    const newPasswordHash = "$argon2id$synthetic-updated-test-hash";
+
+    await unitOfWork.transaction(async (transaction) => {
+      await transaction.users.insert(registration.user);
+    });
+
+    await expect(
+      unitOfWork.transaction(async (transaction) => {
+        const updated = await transaction.users.updatePassword(
+          registration.user.id,
+          newPasswordHash,
+          updatedAt,
+        );
+
+        expect(updated).toBe(true);
+
+        throw new Error("Simulated transaction failure.");
+      }),
+    ).rejects.toThrow("Simulated transaction failure.");
+
+    const [persistedUser] = await db.select().from(users);
+
+    expect(persistedUser?.passwordHash).toBe(registration.user.passwordHash);
+    expect(persistedUser?.updatedAt).not.toEqual(updatedAt);
   });
 });
