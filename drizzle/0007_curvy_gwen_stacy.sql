@@ -1,0 +1,2 @@
+DROP INDEX "restaurant_memberships_active_owner_uidx";--> statement-breakpoint
+CREATE UNIQUE INDEX "restaurant_memberships_at_most_one_active_owner_uidx" ON "restaurant_memberships" USING btree ("restaurant_id") WHERE "restaurant_memberships"."role" = 'owner' AND "restaurant_memberships"."status" = 'active';
