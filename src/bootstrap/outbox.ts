@@ -11,8 +11,10 @@ import {
 } from "#infrastructure/secrets/secrets-manager.js";
 import { SystemClock } from "#infrastructure/time/system-clock.js";
 import { HmacEmailVerificationTokenSigner } from "#modules/identity/infrastructure/cryptography/hmac-email-verification-token-signer.js";
+import { HmacPasswordResetTokenSigner } from "#modules/identity/infrastructure/cryptography/hmac-password-reset-token-signer.js";
 import { EmailVerificationRequestedHandler } from "#modules/outbox/application/email-verification-requested.handler.js";
 import { OutboxPublisher } from "#modules/outbox/application/outbox-publisher.js";
+import { PasswordResetRequestedHandler } from "#modules/outbox/application/password-reset-requested.handler.js";
 import { RoutingOutboxEventDispatcher } from "#modules/outbox/application/routing-outbox-event-dispatcher.js";
 import { EjsEmailTemplateRenderer } from "#modules/outbox/infrastructure/email/ejs-email-template-renderer.js";
 import { ResendEmailSender } from "#modules/outbox/infrastructure/email/resend-email-sender.js";
@@ -20,6 +22,7 @@ import { DrizzleEmailVerificationRecipientRepository } from "#modules/outbox/inf
 import { DrizzleOutboxRepository } from "#modules/outbox/infrastructure/persistence/drizzle-outbox-repository.js";
 
 import type { Clock } from "#modules/identity/application/ports/clock.js";
+import type { OutboxEventHandler } from "#modules/outbox/application/ports/outbox-event-handler.js";
 
 const clock: Clock = new SystemClock();
 
@@ -44,7 +47,13 @@ export const getOutboxPublisher = createAsyncSingleton(async () => {
 
   const outboxRepository = new DrizzleOutboxRepository(database);
 
-  const tokenSigner = new HmacEmailVerificationTokenSigner(
+  const emailVerificationTokenSigner = new HmacEmailVerificationTokenSigner(
+    emailVerificationSecret.EMAIL_VERIFICATION_SECRET,
+  );
+
+  // TODO: Introduce a dedicated PASSWORD_RESET_SECRET.
+  // The signer uses a separate cryptographic context to domain-separate tokens.
+  const passwordResetTokenSigner = new HmacPasswordResetTokenSigner(
     emailVerificationSecret.EMAIL_VERIFICATION_SECRET,
   );
 
@@ -53,21 +62,35 @@ export const getOutboxPublisher = createAsyncSingleton(async () => {
     emailSender,
     emailTemplateRenderer,
     recipients: recipientRepository,
-    tokenSigner,
+    tokenSigner: emailVerificationTokenSigner,
     buildVerificationUrl(token: string): string {
       const url = new URL("/verify-email", outboxConfig.publicAppUrl);
-
       url.searchParams.set("token", token);
 
       return url.toString();
     },
   });
 
-  const dispatcher = new RoutingOutboxEventDispatcher(
-    new Map([
-      ["identity.email_verification_requested.v1", emailVerificationHandler],
-    ]),
-  );
+  const passwordResetHandler = new PasswordResetRequestedHandler({
+    clock,
+    emailSender,
+    emailTemplateRenderer,
+    recipients: recipientRepository,
+    tokenSigner: passwordResetTokenSigner,
+    buildPasswordResetUrl(token: string): string {
+      const url = new URL("/reset-password", outboxConfig.publicAppUrl);
+      url.searchParams.set("token", token);
+
+      return url.toString();
+    },
+  });
+
+  const handlers = new Map<string, OutboxEventHandler>([
+    ["identity.email_verification_requested.v1", emailVerificationHandler],
+    ["identity.password_reset_requested.v1", passwordResetHandler],
+  ]);
+
+  const dispatcher = new RoutingOutboxEventDispatcher(handlers);
 
   return new OutboxPublisher({
     clock,

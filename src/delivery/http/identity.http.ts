@@ -1,6 +1,10 @@
 import express, { type Response } from "express";
 
 import { createRequireAuthentication } from "#delivery/http/middleware/require-authentication.js";
+import {
+  ConfirmPasswordRecoveryCommand,
+  confirmPasswordRecoverySchema,
+} from "#modules/identity/application/commands/confirm-password-recovery.schema.js";
 import { InvalidCredentialsError } from "#modules/identity/application/commands/login.handler.js";
 import {
   loginSchema,
@@ -21,6 +25,7 @@ import {
 } from "#modules/identity/application/commands/verify-email.schema.js";
 import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
 import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
+import { InvalidPasswordResetTokenError } from "#modules/identity/application/invalid-password-reset-token.error.js";
 import { UserProfileNotFoundError } from "#modules/identity/application/queries/get-user-profile.handler.js";
 
 import type { LoginResult } from "#modules/identity/application/commands/login.handler.js";
@@ -55,6 +60,12 @@ export interface RequestPasswordRecoveryHandlerContract {
   ): Promise<RequestPasswordRecoveryResult>;
 }
 
+export interface ConfirmPasswordRecoveryHandlerContract {
+  execute(
+    command: ConfirmPasswordRecoveryCommand,
+  ): Promise<{ passwordReset: true }>;
+}
+
 export interface IdentityHttpDependencies {
   getLoginHandler: () => Promise<LoginHandlerContract>;
   getRegisterUserHandler: () => Promise<RegistrationHandler>;
@@ -63,6 +74,7 @@ export interface IdentityHttpDependencies {
   getUserProfileHandler: () => Promise<UserProfileHandlerContract>;
   getActiveUserHandler: () => Promise<ActiveUserHandlerContract>;
   getRequestPasswordRecoveryHandler: () => Promise<RequestPasswordRecoveryHandlerContract>;
+  getConfirmPasswordRecoveryHandler: () => Promise<ConfirmPasswordRecoveryHandlerContract>;
 }
 
 export function createIdentityRouter(dependencies: IdentityHttpDependencies) {
@@ -245,6 +257,45 @@ export function createIdentityRouter(dependencies: IdentityHttpDependencies) {
     } catch (error) {
       console.error(
         "Password recovery request failed:",
+        error instanceof Error ? error.name : "UnknownError",
+      );
+
+      return res.status(500).json({
+        error: "INTERNAL_SERVER_ERROR",
+        message: "An unexpected error occurred.",
+      });
+    }
+  });
+
+  router.post("/password-recovery/confirm", async (req, res) => {
+    const validation = confirmPasswordRecoverySchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({
+        error: "VALIDATION_ERROR",
+        message: "The password reset data is invalid.",
+        issues: validation.error.issues.map((issue) => ({
+          path: issue.path,
+          message: issue.message,
+        })),
+      });
+    }
+
+    try {
+      const handler = await dependencies.getConfirmPasswordRecoveryHandler();
+      const result = await handler.execute(validation.data);
+
+      return res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof InvalidPasswordResetTokenError) {
+        return res.status(400).json({
+          error: "INVALID_PASSWORD_RESET_TOKEN",
+          message: "The password reset token is invalid or has expired.",
+        });
+      }
+
+      console.error(
+        "Password recovery confirmation failed:",
         error instanceof Error ? error.name : "UnknownError",
       );
 

@@ -8,6 +8,7 @@ import {
   getEmailVerificationSecret,
 } from "#infrastructure/secrets/secrets-manager.js";
 import { SystemClock } from "#infrastructure/time/system-clock.js";
+import { ConfirmPasswordRecoveryHandler } from "#modules/identity/application/commands/confirm-password-recovery.handler.js";
 import { LoginHandler } from "#modules/identity/application/commands/login.handler.js";
 import { RegisterUserHandler } from "#modules/identity/application/commands/register-user.handler.js";
 import { RequestPasswordRecoveryHandler } from "#modules/identity/application/commands/request-password-recovery.handler.js";
@@ -141,6 +142,18 @@ export const getRequestPasswordRecoveryHandler = createAsyncSingleton(
     return new RequestPasswordRecoveryHandler({
       ids,
       clock,
+      ...dependencies,
+    });
+  },
+);
+
+export const getConfirmPasswordRecoveryHandler = createAsyncSingleton(
+  async () => {
+    const dependencies = await getIdentityDependencies();
+
+    return new ConfirmPasswordRecoveryHandler({
+      clock,
+      passwordHasher: new Argon2PasswordHasher(),
       ...dependencies,
     });
   },
