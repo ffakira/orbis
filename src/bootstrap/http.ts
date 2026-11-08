@@ -1,8 +1,11 @@
+
 import { createApp } from "#delivery/http/app.js";
 
 import {
+  getAccessTokenVerifier,
   getLoginHandler,
   getRegisterUserHandler,
+  getUserProfileHandler,
   getVerifyEmailHandler,
 } from "#bootstrap/identity.js";
 
@@ -39,5 +42,7 @@ export const app = createApp({
   getLoginHandler,
   getRegisterUserHandler,
   getVerifyEmailHandler,
+  getAccessTokenVerifier,
+  getUserProfileHandler,
   checkDatabaseReadiness,
 });

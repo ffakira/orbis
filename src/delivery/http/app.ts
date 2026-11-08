@@ -3,6 +3,8 @@ import express from "express";
 import type { LoginResult } from "#modules/identity/application/commands/login.handler.js";
 import type { RegisterUserResult } from "#modules/identity/application/commands/register-user.handler.js";
 import type { VerifyEmailResult } from "#modules/identity/application/commands/verify-email.handler.js";
+import type { UserProfile } from "#modules/identity/application/ports/user-profile-repository.js";
+import type { AccessTokenVerifier } from "#modules/identity/application/ports/access-token-verifier.js";
 
 import {
   loginSchema,
@@ -18,8 +20,11 @@ import {
 } from "#modules/identity/application/commands/verify-email.schema.js";
 
 import { InvalidCredentialsError } from "#modules/identity/application/commands/login.handler.js";
+import { UserProfileNotFoundError } from "#modules/identity/application/queries/get-user-profile.handler.js";
 import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
 import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
+
+import { createRequireAuthentication } from "#delivery/http/middleware/require-authentication.js";
 
 export interface LoginHandlerContract {
   execute(command: LoginCommand): Promise<LoginResult>;
@@ -33,6 +38,10 @@ export interface EmailVerificationHandler {
   execute(command: VerifyEmailCommand): Promise<VerifyEmailResult>;
 }
 
+export interface UserProfileHandlerContract {
+  execute(userId: string): Promise<UserProfile>;
+}
+
 export interface DatabaseReadiness {
   database: string;
   username: string;
@@ -43,6 +52,8 @@ export interface AppDependencies {
   getLoginHandler: () => Promise<LoginHandlerContract>;
   getRegisterUserHandler: () => Promise<RegistrationHandler>;
   getVerifyEmailHandler: () => Promise<EmailVerificationHandler>;
+  getAccessTokenVerifier: () => Promise<AccessTokenVerifier>;
+  getUserProfileHandler: () => Promise<UserProfileHandlerContract>;
   checkDatabaseReadiness: () => Promise<DatabaseReadiness>;
 }
 
@@ -50,6 +61,10 @@ export function createApp(dependencies: AppDependencies) {
   const app = express();
 
   app.use(express.json({ limit: "16kb" }));
+
+  const requireAuthentication = createRequireAuthentication({
+    getAccessTokenVerifier: dependencies.getAccessTokenVerifier,
+  });
 
   app.get("/health", (_req, res) => {
     return res.status(200).json({
@@ -79,6 +94,35 @@ export function createApp(dependencies: AppDependencies) {
         status: "error",
         message: "Database is unavailable",
         timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  app.get("/identity/me", requireAuthentication, async (_req, res) => {
+    try {
+      const userId = res.locals.auth.userId;
+      const handler = await dependencies.getUserProfileHandler();
+      const profile = await handler.execute(userId);
+
+      return res.status(200).json({
+        user: profile,
+      });
+    } catch (error) {
+      if (error instanceof UserProfileNotFoundError) {
+        return res.status(401).json({
+          error: "UNAUTHENTICATED",
+          message: "The authenticated user is no longer available.",
+        });
+      }
+
+      console.error(
+        "Retrieving authenticated user profile failed:",
+        error instanceof Error ? error.name : "UnknownError",
+      );
+
+      return res.status(500).json({
+        error: "INTERNAL_SERVER_ERROR",
+        message: "An unexpected error occurred.",
       });
     }
   });

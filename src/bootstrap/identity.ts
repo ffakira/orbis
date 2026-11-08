@@ -10,6 +10,7 @@ import { getDatabase } from "#infrastructure/database/client.js";
 import { LoginHandler } from "#modules/identity/application/commands/login.handler.js";
 import { RegisterUserHandler } from "#modules/identity/application/commands/register-user.handler.js";
 import { VerifyEmailHandler } from "#modules/identity/application/commands/verify-email.handler.js";
+import { GetUserProfileHandler } from "#modules/identity/application/queries/get-user-profile.handler.js";
 
 import type { Clock } from "#modules/identity/application/ports/clock.js";
 import type { IdGenerator } from "#modules/identity/application/ports/id-generator.js";
@@ -18,7 +19,9 @@ import type { TermsPolicy } from "#modules/identity/application/ports/terms-poli
 import { Argon2PasswordHasher } from "#modules/identity/infrastructure/cryptography/argon2-password-hasher.js";
 import { HmacEmailVerificationTokenSigner } from "#modules/identity/infrastructure/cryptography/hmac-email-verification-token-signer.js";
 import { JoseAccessTokenIssuer } from "#modules/identity/infrastructure/cryptography/jose-access-token-issuer.js";
+import { JoseAccessTokenVerifier } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
 import { DrizzleAuthenticationUserRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-authentication-user-repository.js";
+import { DrizzleUserProfileRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-user-profile-repository.js";
 import { DrizzleIdentityUnitOfWork } from "#modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
 
 class SystemClock implements Clock {
@@ -145,4 +148,36 @@ export function getLoginHandler(): Promise<LoginHandler> {
   });
 
   return loginHandlerPromise;
+}
+
+let accessTokenVerifierPromise: Promise<JoseAccessTokenVerifier> | undefined;
+
+export function getAccessTokenVerifier(): Promise<JoseAccessTokenVerifier> {
+  accessTokenVerifierPromise ??= (async () => {
+    const authenticationSecret = await getAuthenticationSecret();
+
+    return new JoseAccessTokenVerifier(authenticationSecret.JWT_SECRET);
+  })().catch((error: unknown) => {
+    accessTokenVerifierPromise = undefined;
+    throw error;
+  });
+
+  return accessTokenVerifierPromise;
+}
+
+let userProfileHandlerPromise: Promise<GetUserProfileHandler> | undefined;
+
+export function getUserProfileHandler(): Promise<GetUserProfileHandler> {
+  userProfileHandlerPromise ??= (async () => {
+    const db = await getDatabase();
+
+    return new GetUserProfileHandler({
+      userProfiles: new DrizzleUserProfileRepository(db),
+    });
+  })().catch((error: unknown) => {
+    userProfileHandlerPromise = undefined;
+    throw error;
+  });
+
+  return userProfileHandlerPromise;
 }

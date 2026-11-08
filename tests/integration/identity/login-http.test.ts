@@ -4,13 +4,11 @@ import request from "supertest";
 import { createApp } from "#delivery/http/app.js";
 
 import { InvalidCredentialsError } from "#modules/identity/application/commands/login.handler.js";
+import { InvalidAccessTokenError } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
 
 import type { LoginCommand } from "#modules/identity/application/commands/login.schema.js";
 import type { LoginResult } from "#modules/identity/application/commands/login.handler.js";
-import type { RegisterUserResult } from "#modules/identity/application/commands/register-user.handler.js";
-import type { RegisterUserCommand } from "#modules/identity/application/commands/register-user.schema.js";
-import type { VerifyEmailResult } from "#modules/identity/application/commands/verify-email.handler.js";
-import type { VerifyEmailCommand } from "#modules/identity/application/commands/verify-email.schema.js";
+import type { UserProfile } from "#modules/identity/application/ports/user-profile-repository.js";
 
 const validLogin: LoginCommand = {
   email: "test@example.com",
@@ -23,6 +21,16 @@ const loginResult: LoginResult = {
   expiresAt: "2026-11-07T10:15:00.000Z",
 };
 
+const userProfile: UserProfile = {
+  userId: "00000000-0000-4000-8000-000000000001",
+  firstName: "Test",
+  lastName: "User",
+  email: "test@example.com",
+  phone: "+15555550100",
+  status: "active",
+  createdAt: new Date("2026-01-15T10:00:00.000Z"),
+};
+
 function createTestApp() {
   const loginExecute = vi.fn(
     async (_command: LoginCommand): Promise<LoginResult> => loginResult,
@@ -32,24 +40,40 @@ function createTestApp() {
     execute: loginExecute,
   }));
 
-  const registerExecute = vi.fn(
-    async (_command: RegisterUserCommand): Promise<RegisterUserResult> => ({
-      userId: "00000000-0000-4000-8000-000000000001",
-    }),
-  );
-
   const getRegisterUserHandler = vi.fn(async () => ({
-    execute: registerExecute,
+    execute: vi.fn(),
   }));
 
-  const verifyExecute = vi.fn(
-    async (_command: VerifyEmailCommand): Promise<VerifyEmailResult> => ({
-      verified: true,
-    }),
-  );
-
   const getVerifyEmailHandler = vi.fn(async () => ({
-    execute: verifyExecute,
+    execute: vi.fn(),
+  }));
+
+  const verifyToken = vi.fn(async (token: string) => {
+    if (token !== "synthetic-valid-access-token") {
+      throw new InvalidAccessTokenError();
+    }
+
+    return {
+      userId: userProfile.userId,
+      issuedAt: new Date("2026-01-15T10:00:00.000Z"),
+      expiresAt: new Date("2026-01-15T10:15:00.000Z"),
+    };
+  });
+
+  const getAccessTokenVerifier = vi.fn(async () => ({
+    verify: verifyToken,
+  }));
+
+  const profileExecute = vi.fn(async (userId: string): Promise<UserProfile> => {
+    if (userId !== userProfile.userId) {
+      throw new Error("Unexpected user ID.");
+    }
+
+    return userProfile;
+  });
+
+  const getUserProfileHandler = vi.fn(async () => ({
+    execute: profileExecute,
   }));
 
   const checkDatabaseReadiness = vi.fn(async () => ({
@@ -62,6 +86,8 @@ function createTestApp() {
     getLoginHandler,
     getRegisterUserHandler,
     getVerifyEmailHandler,
+    getAccessTokenVerifier,
+    getUserProfileHandler,
     checkDatabaseReadiness,
   });
 
@@ -69,6 +95,9 @@ function createTestApp() {
     app,
     loginExecute,
     getLoginHandler,
+    verifyToken,
+    profileExecute,
+    getUserProfileHandler,
   };
 }
 
@@ -152,6 +181,74 @@ describe("POST /identity/login", () => {
         error: "INTERNAL_SERVER_ERROR",
         message: "An unexpected error occurred.",
       });
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+});
+
+describe("GET /identity/me", () => {
+  it("returns the authenticated user's profile", async () => {
+    const { app, verifyToken, profileExecute, getUserProfileHandler } =
+      createTestApp();
+
+    const response = await request(app)
+      .get("/identity/me")
+      .set("Authorization", "Bearer synthetic-valid-access-token");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      user: {
+        ...userProfile,
+        createdAt: userProfile.createdAt.toISOString(),
+      },
+    });
+
+    expect(verifyToken).toHaveBeenCalledOnce();
+    expect(verifyToken).toHaveBeenCalledWith("synthetic-valid-access-token");
+
+    expect(getUserProfileHandler).toHaveBeenCalledOnce();
+    expect(profileExecute).toHaveBeenCalledWith(userProfile.userId);
+  });
+
+  it("returns 401 when the authorization header is missing", async () => {
+    const { app, verifyToken, getUserProfileHandler } = createTestApp();
+
+    const response = await request(app).get("/identity/me");
+
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBe("UNAUTHENTICATED");
+    expect(verifyToken).not.toHaveBeenCalled();
+    expect(getUserProfileHandler).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 when the access token is invalid", async () => {
+    const { app, verifyToken, getUserProfileHandler } = createTestApp();
+
+    const response = await request(app)
+      .get("/identity/me")
+      .set("Authorization", "Bearer invalid-token");
+
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBe("UNAUTHENTICATED");
+    expect(verifyToken).toHaveBeenCalledOnce();
+    expect(getUserProfileHandler).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 when the authenticated user no longer exists", async () => {
+    const { app, profileExecute } = createTestApp();
+
+    profileExecute.mockRejectedValue(new Error("Synthetic missing user."));
+
+    // The route maps unexpected profile errors to 500.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const response = await request(app)
+        .get("/identity/me")
+        .set("Authorization", "Bearer synthetic-valid-access-token");
+
+      expect(response.status).toBe(500);
     } finally {
       errorSpy.mockRestore();
     }

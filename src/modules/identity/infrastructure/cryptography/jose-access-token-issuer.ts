@@ -7,6 +7,8 @@ import type {
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const JWT_ALGORITHM = "HS256";
+const JWT_ISSUER = "orbis";
+const JWT_AUDIENCE = "orbis-api";
 
 export class JoseAccessTokenIssuer implements AccessTokenIssuer {
   private readonly secret: Uint8Array;
@@ -27,6 +29,8 @@ export class JoseAccessTokenIssuer implements AccessTokenIssuer {
 
     const value = await new SignJWT({})
       .setProtectedHeader({ alg: JWT_ALGORITHM, typ: "JWT" })
+      .setIssuer(JWT_ISSUER)
+      .setAudience(JWT_AUDIENCE)
       .setSubject(userId)
       .setIssuedAt(issuedAtSeconds)
       .setExpirationTime(issuedAtSeconds + ACCESS_TOKEN_TTL_SECONDS)
