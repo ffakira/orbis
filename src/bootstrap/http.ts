@@ -7,6 +7,7 @@ import {
   getRegisterUserHandler,
   getUserProfileHandler,
   getVerifyEmailHandler,
+  getActiveUserHandler,
 } from "#bootstrap/identity.js";
 
 import { getDatabasePool } from "#infrastructure/database/postgres.js";
@@ -39,10 +40,13 @@ async function checkDatabaseReadiness() {
 }
 
 export const app = createApp({
-  getLoginHandler,
-  getRegisterUserHandler,
-  getVerifyEmailHandler,
-  getAccessTokenVerifier,
-  getUserProfileHandler,
+  identity: {
+    getLoginHandler,
+    getRegisterUserHandler,
+    getVerifyEmailHandler,
+    getAccessTokenVerifier,
+    getUserProfileHandler,
+    getActiveUserHandler,
+  },
   checkDatabaseReadiness,
 });

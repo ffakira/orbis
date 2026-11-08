@@ -51,8 +51,28 @@ function createTestApp() {
   }));
 
   const app = createApp({
-    getRegisterUserHandler,
-    getVerifyEmailHandler,
+    identity: {
+      getLoginHandler: vi.fn(async () => ({
+        execute: async () => {
+          throw new Error("Not implemented in this test.");
+        },
+      })),
+      getRegisterUserHandler,
+      getVerifyEmailHandler,
+      getAccessTokenVerifier: vi.fn(async () => ({
+        verify: async () => {
+          throw new Error("Not implemented in this test.");
+        },
+      })),
+      getUserProfileHandler: vi.fn(async () => ({
+        execute: async () => {
+          throw new Error("Not implemented in this test.");
+        },
+      })),
+      getActiveUserHandler: vi.fn(async () => ({
+        execute: async () => {},
+      })),
+    },
     checkDatabaseReadiness,
   });
 

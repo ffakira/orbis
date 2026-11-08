@@ -5,10 +5,14 @@ import type {
   VerifiedAccessToken,
 } from "#modules/identity/application/ports/access-token-verifier.js";
 
+import { InactiveUserError } from "#modules/identity/application/queries/get-active-user.handler.js";
 import { InvalidAccessTokenError } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
 
 export interface AuthenticationMiddlewareDependencies {
   getAccessTokenVerifier: () => Promise<AccessTokenVerifier>;
+  getActiveUserHandler: () => Promise<{
+    execute(userId: string): Promise<void>;
+  }>;
 }
 
 export interface AuthenticatedLocals {
@@ -41,11 +45,17 @@ export function createRequireAuthentication(
       const verifier = await dependencies.getAccessTokenVerifier();
       const authenticatedUser = await verifier.verify(match[1]);
 
+      const activeUserHandler = await dependencies.getActiveUserHandler();
+      await activeUserHandler.execute(authenticatedUser.userId);
+
       res.locals.auth = authenticatedUser;
 
       return next();
     } catch (error) {
-      if (error instanceof InvalidAccessTokenError) {
+      if (
+        error instanceof InvalidAccessTokenError ||
+        error instanceof InactiveUserError
+      ) {
         return res.status(401).json({
           error: "UNAUTHENTICATED",
           message: "Authentication is required.",

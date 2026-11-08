@@ -64,6 +64,12 @@ function createTestApp() {
     verify: verifyToken,
   }));
 
+  const activeUserExecute = vi.fn(async (_userId: string) => {});
+
+  const getActiveUserHandler = vi.fn(async () => ({
+    execute: activeUserExecute,
+  }));
+
   const profileExecute = vi.fn(async (userId: string): Promise<UserProfile> => {
     if (userId !== userProfile.userId) {
       throw new Error("Unexpected user ID.");
@@ -83,11 +89,14 @@ function createTestApp() {
   }));
 
   const app = createApp({
-    getLoginHandler,
-    getRegisterUserHandler,
-    getVerifyEmailHandler,
-    getAccessTokenVerifier,
-    getUserProfileHandler,
+    identity: {
+      getLoginHandler,
+      getRegisterUserHandler,
+      getVerifyEmailHandler,
+      getAccessTokenVerifier,
+      getUserProfileHandler,
+      getActiveUserHandler,
+    },
     checkDatabaseReadiness,
   });
 
@@ -96,6 +105,8 @@ function createTestApp() {
     loginExecute,
     getLoginHandler,
     verifyToken,
+    activeUserExecute,
+    getActiveUserHandler,
     profileExecute,
     getUserProfileHandler,
   };
@@ -189,8 +200,13 @@ describe("POST /identity/login", () => {
 
 describe("GET /identity/me", () => {
   it("returns the authenticated user's profile", async () => {
-    const { app, verifyToken, profileExecute, getUserProfileHandler } =
-      createTestApp();
+    const {
+      app,
+      verifyToken,
+      activeUserExecute,
+      profileExecute,
+      getUserProfileHandler,
+    } = createTestApp();
 
     const response = await request(app)
       .get("/identity/me")
@@ -206,6 +222,9 @@ describe("GET /identity/me", () => {
 
     expect(verifyToken).toHaveBeenCalledOnce();
     expect(verifyToken).toHaveBeenCalledWith("synthetic-valid-access-token");
+
+    expect(activeUserExecute).toHaveBeenCalledOnce();
+    expect(activeUserExecute).toHaveBeenCalledWith(userProfile.userId);
 
     expect(getUserProfileHandler).toHaveBeenCalledOnce();
     expect(profileExecute).toHaveBeenCalledWith(userProfile.userId);
@@ -235,22 +254,16 @@ describe("GET /identity/me", () => {
     expect(getUserProfileHandler).not.toHaveBeenCalled();
   });
 
-  it("returns 401 when the authenticated user no longer exists", async () => {
-    const { app, profileExecute } = createTestApp();
+  it("returns 401 when the authenticated user is inactive", async () => {
+    const { app, activeUserExecute, getUserProfileHandler } = createTestApp();
 
-    profileExecute.mockRejectedValue(new Error("Synthetic missing user."));
+    activeUserExecute.mockRejectedValue(new Error("User is inactive."));
 
-    // The route maps unexpected profile errors to 500.
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = await request(app)
+      .get("/identity/me")
+      .set("Authorization", "Bearer synthetic-valid-access-token");
 
-    try {
-      const response = await request(app)
-        .get("/identity/me")
-        .set("Authorization", "Bearer synthetic-valid-access-token");
-
-      expect(response.status).toBe(500);
-    } finally {
-      errorSpy.mockRestore();
-    }
+    expect(response.status).toBe(500);
+    expect(getUserProfileHandler).not.toHaveBeenCalled();
   });
 });

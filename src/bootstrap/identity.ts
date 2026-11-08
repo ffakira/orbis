@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import { env } from "#config/env.js";
+import { createAsyncSingleton } from "#bootstrap/async-singleton.js";
+
 import {
   getAuthenticationSecret,
   getEmailVerificationSecret,
@@ -11,8 +13,10 @@ import { LoginHandler } from "#modules/identity/application/commands/login.handl
 import { RegisterUserHandler } from "#modules/identity/application/commands/register-user.handler.js";
 import { VerifyEmailHandler } from "#modules/identity/application/commands/verify-email.handler.js";
 import { GetUserProfileHandler } from "#modules/identity/application/queries/get-user-profile.handler.js";
+import { GetActiveUserHandler } from "#modules/identity/application/queries/get-active-user.handler.js";
 
 import type { Clock } from "#modules/identity/application/ports/clock.js";
+import { SystemClock } from "#infrastructure/time/system-clock.js";
 import type { IdGenerator } from "#modules/identity/application/ports/id-generator.js";
 import type { TermsPolicy } from "#modules/identity/application/ports/terms-policy.js";
 
@@ -20,15 +24,11 @@ import { Argon2PasswordHasher } from "#modules/identity/infrastructure/cryptogra
 import { HmacEmailVerificationTokenSigner } from "#modules/identity/infrastructure/cryptography/hmac-email-verification-token-signer.js";
 import { JoseAccessTokenIssuer } from "#modules/identity/infrastructure/cryptography/jose-access-token-issuer.js";
 import { JoseAccessTokenVerifier } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
+
 import { DrizzleAuthenticationUserRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-authentication-user-repository.js";
 import { DrizzleUserProfileRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-user-profile-repository.js";
+import { DrizzleActiveUserRepository } from "#modules/identity/infrastructure/persistence/repositories/drizzle-active-user-repository.js";
 import { DrizzleIdentityUnitOfWork } from "#modules/identity/infrastructure/persistence/drizzle-identity-unit-of-work.js";
-
-class SystemClock implements Clock {
-  now(): Date {
-    return new Date();
-  }
-}
 
 class UuidGenerator implements IdGenerator {
   generate(): string {
@@ -50,134 +50,86 @@ class ConfiguredTermsPolicy implements TermsPolicy {
   }
 }
 
-const clock = new SystemClock();
+const clock: Clock = new SystemClock();
+const ids: IdGenerator = new UuidGenerator();
 
-let dependenciesPromise:
-  | Promise<{
-      unitOfWork: DrizzleIdentityUnitOfWork;
-      emailVerificationTokenSigner: HmacEmailVerificationTokenSigner;
-    }>
-  | undefined;
+const getIdentityDependencies = createAsyncSingleton(async () => {
+  const [db, emailVerificationSecret] = await Promise.all([
+    getDatabase(),
+    getEmailVerificationSecret(),
+  ]);
 
-function getIdentityDependencies() {
-  dependenciesPromise ??= (async () => {
-    const [db, emailVerificationSecret] = await Promise.all([
-      getDatabase(),
-      getEmailVerificationSecret(),
-    ]);
+  return {
+    unitOfWork: new DrizzleIdentityUnitOfWork(db),
+    emailVerificationTokenSigner: new HmacEmailVerificationTokenSigner(
+      emailVerificationSecret.EMAIL_VERIFICATION_SECRET,
+    ),
+  };
+});
 
-    return {
-      unitOfWork: new DrizzleIdentityUnitOfWork(db),
-      emailVerificationTokenSigner: new HmacEmailVerificationTokenSigner(
-        emailVerificationSecret.EMAIL_VERIFICATION_SECRET,
-      ),
-    };
-  })().catch((error: unknown) => {
-    dependenciesPromise = undefined;
-    throw error;
+export const getRegisterUserHandler = createAsyncSingleton(async () => {
+  const termsVersion = env.termsOfServiceVersion;
+
+  if (!termsVersion) {
+    throw new Error("TERMS_OF_SERVICE_VERSION is not configured.");
+  }
+
+  const dependencies = await getIdentityDependencies();
+
+  return new RegisterUserHandler({
+    ids,
+    clock,
+    passwordHasher: new Argon2PasswordHasher(),
+    termsPolicy: new ConfiguredTermsPolicy(termsVersion),
+    ...dependencies,
   });
+});
 
-  return dependenciesPromise;
-}
+export const getVerifyEmailHandler = createAsyncSingleton(async () => {
+  const dependencies = await getIdentityDependencies();
 
-let registerUserHandlerPromise: Promise<RegisterUserHandler> | undefined;
-
-export function getRegisterUserHandler(): Promise<RegisterUserHandler> {
-  registerUserHandlerPromise ??= (async () => {
-    const termsVersion = env.termsOfServiceVersion;
-
-    if (!termsVersion) {
-      throw new Error("TERMS_OF_SERVICE_VERSION is not configured.");
-    }
-
-    const dependencies = await getIdentityDependencies();
-
-    return new RegisterUserHandler({
-      ids: new UuidGenerator(),
-      clock,
-      passwordHasher: new Argon2PasswordHasher(),
-      termsPolicy: new ConfiguredTermsPolicy(termsVersion),
-      ...dependencies,
-    });
-  })().catch((error: unknown) => {
-    registerUserHandlerPromise = undefined;
-    throw error;
+  return new VerifyEmailHandler({
+    clock,
+    ...dependencies,
   });
+});
 
-  return registerUserHandlerPromise;
-}
+export const getLoginHandler = createAsyncSingleton(async () => {
+  const [db, authenticationSecret] = await Promise.all([
+    getDatabase(),
+    getAuthenticationSecret(),
+  ]);
 
-let verifyEmailHandlerPromise: Promise<VerifyEmailHandler> | undefined;
-
-export function getVerifyEmailHandler(): Promise<VerifyEmailHandler> {
-  verifyEmailHandlerPromise ??= (async () => {
-    const dependencies = await getIdentityDependencies();
-
-    return new VerifyEmailHandler({
-      clock,
-      ...dependencies,
-    });
-  })().catch((error: unknown) => {
-    verifyEmailHandlerPromise = undefined;
-    throw error;
+  return new LoginHandler({
+    authenticationUsers: new DrizzleAuthenticationUserRepository(db),
+    passwordHasher: new Argon2PasswordHasher(),
+    accessTokenIssuer: new JoseAccessTokenIssuer(
+      authenticationSecret.JWT_SECRET,
+    ),
+    clock,
   });
+});
 
-  return verifyEmailHandlerPromise;
-}
+export const getAccessTokenVerifier = createAsyncSingleton(async () => {
+  const authenticationSecret = await getAuthenticationSecret();
 
-let loginHandlerPromise: Promise<LoginHandler> | undefined;
+  return new JoseAccessTokenVerifier(authenticationSecret.JWT_SECRET);
+});
 
-export function getLoginHandler(): Promise<LoginHandler> {
-  loginHandlerPromise ??= (async () => {
-    const [db, authenticationSecret] = await Promise.all([
-      getDatabase(),
-      getAuthenticationSecret(),
-    ]);
+export const getUserProfileHandler = createAsyncSingleton(async () => {
+  const db = await getDatabase();
 
-    return new LoginHandler({
-      authenticationUsers: new DrizzleAuthenticationUserRepository(db),
-      passwordHasher: new Argon2PasswordHasher(),
-      accessTokenIssuer: new JoseAccessTokenIssuer(
-        authenticationSecret.JWT_SECRET,
-      ),
-      clock,
-    });
-  })().catch((error: unknown) => {
-    loginHandlerPromise = undefined;
-    throw error;
+  return new GetUserProfileHandler({
+    userProfiles: new DrizzleUserProfileRepository(db),
   });
+});
 
-  return loginHandlerPromise;
-}
-
-let accessTokenVerifierPromise: Promise<JoseAccessTokenVerifier> | undefined;
-
-export function getAccessTokenVerifier(): Promise<JoseAccessTokenVerifier> {
-  accessTokenVerifierPromise ??= (async () => {
-    const authenticationSecret = await getAuthenticationSecret();
-
-    return new JoseAccessTokenVerifier(authenticationSecret.JWT_SECRET);
-  })().catch((error: unknown) => {
-    accessTokenVerifierPromise = undefined;
-    throw error;
-  });
-
-  return accessTokenVerifierPromise;
-}
-
-let userProfileHandlerPromise: Promise<GetUserProfileHandler> | undefined;
-
-export function getUserProfileHandler(): Promise<GetUserProfileHandler> {
-  userProfileHandlerPromise ??= (async () => {
+export const getActiveUserHandler = createAsyncSingleton(
+  async () => {
     const db = await getDatabase();
 
-    return new GetUserProfileHandler({
-      userProfiles: new DrizzleUserProfileRepository(db),
+    return new GetActiveUserHandler({
+      activeUsers: new DrizzleActiveUserRepository(db),
     });
-  })().catch((error: unknown) => {
-    userProfileHandlerPromise = undefined;
-    throw error;
-  });
-
-  return userProfileHandlerPromise;
-}
+  },
+);
