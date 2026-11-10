@@ -1,7 +1,7 @@
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp } from "#presentation/http/app.js";
+import { createTestApp } from "../../support/http/create-test-app.js";
 
 import type { RequestPasswordRecoveryCommand } from "#modules/identity/application/commands/request-password-recovery.schema.js";
 
@@ -9,56 +9,9 @@ const validRequest: RequestPasswordRecoveryCommand = {
   email: "test@example.com",
 };
 
-function createTestApp() {
-  const execute = vi.fn(async (_command: RequestPasswordRecoveryCommand) => ({
-    requested: true as const,
-  }));
-
-  const getRequestPasswordRecoveryHandler = vi.fn(async () => ({
-    execute,
-  }));
-
-  const checkDatabaseReadiness = vi.fn(async () => ({
-    database: "test_database",
-    username: "test_user",
-    connectedAt: new Date("2026-01-01T00:00:00.000Z"),
-  }));
-
-  const app = createApp({
-    identity: {
-      getLoginHandler: vi.fn(async () => ({
-        execute: vi.fn(),
-      })),
-      getRegisterUserHandler: vi.fn(async () => ({
-        execute: vi.fn(),
-      })),
-      getVerifyEmailHandler: vi.fn(async () => ({
-        execute: vi.fn(),
-      })),
-      getRequestPasswordRecoveryHandler,
-      getAccessTokenVerifier: vi.fn(async () => ({
-        verify: vi.fn(),
-      })),
-      getUserProfileHandler: vi.fn(async () => ({
-        execute: vi.fn(),
-      })),
-      getActiveUserHandler: vi.fn(async () => ({
-        execute: vi.fn(),
-      })),
-    },
-    checkDatabaseReadiness,
-  });
-
-  return {
-    app,
-    execute,
-    getRequestPasswordRecoveryHandler,
-  };
-}
-
 describe("POST /identity/password-recovery", () => {
   it("returns 200 when the recovery request succeeds", async () => {
-    const { app, execute, getRequestPasswordRecoveryHandler } = createTestApp();
+    const { app, mocks } = createTestApp();
 
     const response = await request(app)
       .post("/identity/password-recovery")
@@ -69,13 +22,17 @@ describe("POST /identity/password-recovery", () => {
       requested: true,
     });
 
-    expect(getRequestPasswordRecoveryHandler).toHaveBeenCalledOnce();
-    expect(execute).toHaveBeenCalledOnce();
-    expect(execute).toHaveBeenCalledWith(validRequest);
+    expect(mocks.identity.passwordRecovery.getHandler).toHaveBeenCalledOnce();
+
+    expect(mocks.identity.passwordRecovery.execute).toHaveBeenCalledOnce();
+
+    expect(mocks.identity.passwordRecovery.execute).toHaveBeenCalledWith(
+      validRequest,
+    );
   });
 
   it("rejects invalid email addresses", async () => {
-    const { app, execute, getRequestPasswordRecoveryHandler } = createTestApp();
+    const { app, mocks } = createTestApp();
 
     const response = await request(app)
       .post("/identity/password-recovery")
@@ -86,12 +43,13 @@ describe("POST /identity/password-recovery", () => {
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("VALIDATION_ERROR");
 
-    expect(getRequestPasswordRecoveryHandler).not.toHaveBeenCalled();
-    expect(execute).not.toHaveBeenCalled();
+    expect(mocks.identity.passwordRecovery.getHandler).not.toHaveBeenCalled();
+
+    expect(mocks.identity.passwordRecovery.execute).not.toHaveBeenCalled();
   });
 
   it("rejects unknown request properties", async () => {
-    const { app, execute } = createTestApp();
+    const { app, mocks } = createTestApp();
 
     const response = await request(app)
       .post("/identity/password-recovery")
@@ -102,13 +60,16 @@ describe("POST /identity/password-recovery", () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("VALIDATION_ERROR");
-    expect(execute).not.toHaveBeenCalled();
+
+    expect(mocks.identity.passwordRecovery.execute).not.toHaveBeenCalled();
   });
 
   it("returns 500 when the recovery request fails unexpectedly", async () => {
-    const { app, execute } = createTestApp();
+    const { app, mocks } = createTestApp();
 
-    execute.mockRejectedValue(new Error("Synthetic database failure"));
+    mocks.identity.passwordRecovery.execute.mockRejectedValue(
+      new Error("Synthetic database failure"),
+    );
 
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 

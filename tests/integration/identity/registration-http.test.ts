@@ -3,12 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
 import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
-import { createApp } from "#presentation/http/app.js";
 
-import type { RegisterUserResult } from "#modules/identity/application/commands/register-user.handler.js";
-import type { RegisterUserCommand } from "#modules/identity/application/commands/register-user.schema.js";
-import type { VerifyEmailResult } from "#modules/identity/application/commands/verify-email.handler.js";
-import type { VerifyEmailCommand } from "#modules/identity/application/commands/verify-email.schema.js";
+import {
+  createTestApp,
+  TEST_USER_ID,
+} from "../../support/http/create-test-app.js";
 
 const validRegistration = {
   firstName: "Test",
@@ -19,95 +18,29 @@ const validRegistration = {
   acceptTerms: true,
 };
 
-const userId = "00000000-0000-4000-8000-000000000001";
-
-function createTestApp() {
-  const execute = vi.fn(
-    async (_command: RegisterUserCommand): Promise<RegisterUserResult> => ({
-      userId,
-    }),
-  );
-
-  const getRegisterUserHandler = vi.fn(async () => ({
-    execute,
-  }));
-
-  const verifyExecute = vi.fn(
-    async (_command: VerifyEmailCommand): Promise<VerifyEmailResult> => ({
-      verified: true,
-    }),
-  );
-
-  const getVerifyEmailHandler = vi.fn(async () => ({
-    execute: verifyExecute,
-  }));
-
-  const checkDatabaseReadiness = vi.fn(async () => ({
-    database: "test_database",
-    username: "test_user",
-    connectedAt: new Date("2026-01-01T00:00:00.000Z"),
-  }));
-
-  const app = createApp({
-    identity: {
-      getLoginHandler: vi.fn(async () => ({
-        execute: async () => {
-          throw new Error("Not implemented in this test.");
-        },
-      })),
-      getRegisterUserHandler,
-      getVerifyEmailHandler,
-      getAccessTokenVerifier: vi.fn(async () => ({
-        verify: async () => {
-          throw new Error("Not implemented in this test.");
-        },
-      })),
-      getUserProfileHandler: vi.fn(async () => ({
-        execute: async () => {
-          throw new Error("Not implemented in this test.");
-        },
-      })),
-      getActiveUserHandler: vi.fn(async () => ({
-        execute: async () => {},
-      })),
-      getRequestPasswordRecoveryHandler: vi.fn(async () => ({
-        execute: vi.fn(async () => ({
-          requested: true as const,
-        })),
-      })),
-    },
-    checkDatabaseReadiness,
-  });
-
-  return {
-    app,
-    execute,
-    getRegisterUserHandler,
-    getVerifyEmailHandler,
-    checkDatabaseReadiness,
-    verifyExecute,
-  };
-}
-
 describe("POST /identity/register", () => {
   it("returns 201 when registration succeeds", async () => {
-    const { app, execute } = createTestApp();
+    const { app, mocks } = createTestApp();
 
     const response = await request(app)
       .post("/identity/register")
       .send(validRegistration);
 
     expect(response.status).toBe(201);
-    expect(response.body).toEqual({ userId });
+    expect(response.body).toEqual({ userId: TEST_USER_ID });
 
-    expect(execute).toHaveBeenCalledOnce();
-    expect(execute).toHaveBeenCalledWith(validRegistration);
+    expect(mocks.identity.registration.execute).toHaveBeenCalledOnce();
+    expect(mocks.identity.registration.execute).toHaveBeenCalledWith(
+      validRegistration,
+    );
   });
 
   it("returns 409 when the email is already registered", async () => {
-    const { app, execute } = createTestApp();
+    const { app, mocks } = createTestApp();
 
-    execute.mockRejectedValue(new EmailAlreadyRegisteredError());
+    mocks.identity.registration.execute.mockRejectedValue(
+      new EmailAlreadyRegisteredError(),
+    );
 
     const response = await request(app)
       .post("/identity/register")
@@ -121,7 +54,7 @@ describe("POST /identity/register", () => {
   });
 
   it("returns 400 when registration data is invalid", async () => {
-    const { app, execute, getRegisterUserHandler } = createTestApp();
+    const { app, mocks } = createTestApp();
 
     const response = await request(app)
       .post("/identity/register")
@@ -140,12 +73,12 @@ describe("POST /identity/register", () => {
       ]),
     );
 
-    expect(getRegisterUserHandler).not.toHaveBeenCalled();
-    expect(execute).not.toHaveBeenCalled();
+    expect(mocks.identity.registration.getHandler).not.toHaveBeenCalled();
+    expect(mocks.identity.registration.execute).not.toHaveBeenCalled();
   });
 
   it("rejects unknown request properties", async () => {
-    const { app, execute } = createTestApp();
+    const { app, mocks } = createTestApp();
 
     const response = await request(app)
       .post("/identity/register")
@@ -156,13 +89,15 @@ describe("POST /identity/register", () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("VALIDATION_ERROR");
-    expect(execute).not.toHaveBeenCalled();
+    expect(mocks.identity.registration.execute).not.toHaveBeenCalled();
   });
 
   it("returns 500 when registration fails unexpectedly", async () => {
-    const { app, execute } = createTestApp();
+    const { app, mocks } = createTestApp();
 
-    execute.mockRejectedValue(new Error("Synthetic database failure"));
+    mocks.identity.registration.execute.mockRejectedValue(
+      new Error("Synthetic database failure"),
+    );
 
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -186,7 +121,7 @@ describe("POST /identity/verify-email", () => {
   const validToken = "a".repeat(43);
 
   it("returns 200 when email verification succeeds", async () => {
-    const { app, verifyExecute } = createTestApp();
+    const { app, mocks } = createTestApp();
 
     const response = await request(app)
       .post("/identity/verify-email")
@@ -195,16 +130,18 @@ describe("POST /identity/verify-email", () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ verified: true });
 
-    expect(verifyExecute).toHaveBeenCalledOnce();
-    expect(verifyExecute).toHaveBeenCalledWith({
+    expect(mocks.identity.emailVerification.execute).toHaveBeenCalledOnce();
+    expect(mocks.identity.emailVerification.execute).toHaveBeenCalledWith({
       token: validToken,
     });
   });
 
   it("returns a generic error when the verification token is invalid", async () => {
-    const { app, verifyExecute } = createTestApp();
+    const { app, mocks } = createTestApp();
 
-    verifyExecute.mockRejectedValue(new InvalidEmailVerificationTokenError());
+    mocks.identity.emailVerification.execute.mockRejectedValue(
+      new InvalidEmailVerificationTokenError(),
+    );
 
     const response = await request(app)
       .post("/identity/verify-email")
@@ -218,7 +155,7 @@ describe("POST /identity/verify-email", () => {
   });
 
   it("rejects malformed tokens without invoking the handler", async () => {
-    const { app, verifyExecute, getVerifyEmailHandler } = createTestApp();
+    const { app, mocks } = createTestApp();
 
     const response = await request(app)
       .post("/identity/verify-email")
@@ -227,27 +164,29 @@ describe("POST /identity/verify-email", () => {
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("VALIDATION_ERROR");
 
-    expect(getVerifyEmailHandler).not.toHaveBeenCalled();
-    expect(verifyExecute).not.toHaveBeenCalled();
+    expect(mocks.identity.emailVerification.getHandler).not.toHaveBeenCalled();
+    expect(mocks.identity.emailVerification.execute).not.toHaveBeenCalled();
   });
 
   it("rejects unknown request properties", async () => {
-    const { app, verifyExecute } = createTestApp();
+    const { app, mocks } = createTestApp();
 
     const response = await request(app).post("/identity/verify-email").send({
       token: validToken,
-      userId,
+      userId: TEST_USER_ID,
     });
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("VALIDATION_ERROR");
-    expect(verifyExecute).not.toHaveBeenCalled();
+    expect(mocks.identity.emailVerification.execute).not.toHaveBeenCalled();
   });
 
   it("returns 500 when verification fails unexpectedly", async () => {
-    const { app, verifyExecute } = createTestApp();
+    const { app, mocks } = createTestApp();
 
-    verifyExecute.mockRejectedValue(new Error("Synthetic database failure"));
+    mocks.identity.emailVerification.execute.mockRejectedValue(
+      new Error("Synthetic database failure"),
+    );
 
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
