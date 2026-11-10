@@ -1,9 +1,9 @@
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp } from "#delivery/http/app.js";
 import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
 import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
+import { createApp } from "#presentation/http/app.js";
 
 import type { RegisterUserResult } from "#modules/identity/application/commands/register-user.handler.js";
 import type { RegisterUserCommand } from "#modules/identity/application/commands/register-user.schema.js";

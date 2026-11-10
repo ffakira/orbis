@@ -1,7 +1,7 @@
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp } from "#delivery/http/app.js";
+import { createApp } from "#presentation/http/app.js";
 
 import type { RequestPasswordRecoveryCommand } from "#modules/identity/application/commands/request-password-recovery.schema.js";
 

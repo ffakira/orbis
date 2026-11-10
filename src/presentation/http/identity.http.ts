@@ -1,6 +1,5 @@
 import express, { type Response } from "express";
 
-import { createRequireAuthentication } from "#delivery/http/middleware/require-authentication.js";
 import {
   ConfirmPasswordRecoveryCommand,
   confirmPasswordRecoverySchema,
@@ -27,6 +26,7 @@ import { EmailAlreadyRegisteredError } from "#modules/identity/application/email
 import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
 import { InvalidPasswordResetTokenError } from "#modules/identity/application/invalid-password-reset-token.error.js";
 import { UserProfileNotFoundError } from "#modules/identity/application/queries/get-user-profile.handler.js";
+import { createRequireAuthentication } from "#presentation/http/middleware/require-authentication.js";
 
 import type { LoginResult } from "#modules/identity/application/commands/login.handler.js";
 import type { RegisterUserResult } from "#modules/identity/application/commands/register-user.handler.js";

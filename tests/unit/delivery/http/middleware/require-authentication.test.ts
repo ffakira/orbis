@@ -2,12 +2,12 @@ import express, { type ErrorRequestHandler } from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
-import { createRequireAuthentication } from "#delivery/http/middleware/require-authentication.js";
 import {
   InactiveUserError,
   InvalidTokenVersionError,
 } from "#modules/identity/application/queries/get-active-user.handler.js";
 import { InvalidAccessTokenError } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
+import { createRequireAuthentication } from "#presentation/http/middleware/require-authentication.js";
 
 import type {
   AccessTokenVerifier,

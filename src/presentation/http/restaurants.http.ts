@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   createRequireAuthentication,
   type AuthenticatedLocals,
-} from "#delivery/http/middleware/require-authentication.js";
+} from "#presentation/http/middleware/require-authentication.js";
 
 import type { CreateRestaurantResult } from "#modules/restaurants/application/commands/create-restaurant.handler.js";
 import type { CreateRestaurantCommand } from "#modules/restaurants/application/commands/create-restaurant.schema.js";

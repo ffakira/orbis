@@ -66,9 +66,9 @@
       "development": "./src/config/*",
       "default": "./dist/config/*"
     },
-    "#delivery/*": {
-      "development": "./src/delivery/*",
-      "default": "./dist/delivery/*"
+    "#presentation/*": {
+      "development": "./src/presentation/*",
+      "default": "./dist/presentation/*"
     },
     "#infrastructure/*": {
       "development": "./src/infrastructure/*",

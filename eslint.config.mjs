@@ -111,7 +111,7 @@ export default defineConfig(
       "boundaries/elements": [
         { type: "bootstrap", pattern: "src/bootstrap/**" },
         { type: "config", pattern: "src/config/**" },
-        { type: "delivery", pattern: "src/delivery/**" },
+        { type: "presentation", pattern: "src/presentation/**" },
         { type: "infrastructure", pattern: "src/infrastructure/**" },
         {
           type: "module-domain",

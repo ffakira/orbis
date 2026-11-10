@@ -1,8 +1,8 @@
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp } from "#delivery/http/app.js";
 import { InvalidAccessTokenError } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
+import { createApp } from "#presentation/http/app.js";
 
 import type { CreateRestaurantResult } from "#modules/restaurants/application/commands/create-restaurant.handler.js";
 import type { CreateRestaurantCommand } from "#modules/restaurants/application/commands/create-restaurant.schema.js";

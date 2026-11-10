@@ -1,10 +1,10 @@
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp } from "#delivery/http/app.js";
 import { InvalidCredentialsError } from "#modules/identity/application/commands/login.handler.js";
 import { InactiveUserError } from "#modules/identity/application/queries/get-active-user.handler.js";
 import { InvalidAccessTokenError } from "#modules/identity/infrastructure/cryptography/jose-access-token-verifier.js";
+import { createApp } from "#presentation/http/app.js";
 
 import type { LoginResult } from "#modules/identity/application/commands/login.handler.js";
 import type { LoginCommand } from "#modules/identity/application/commands/login.schema.js";

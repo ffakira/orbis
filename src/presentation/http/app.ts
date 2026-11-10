@@ -3,11 +3,11 @@ import express from "express";
 import {
   createIdentityRouter,
   type IdentityHttpDependencies,
-} from "#delivery/http/identity.http.js";
+} from "#presentation/http/identity.http.js";
 import {
   createRestaurantsRouter,
   type RestaurantsHttpDependencies,
-} from "#delivery/http/restaurants.http.js";
+} from "#presentation/http/restaurants.http.js";
 
 export interface DatabaseReadiness {
   database: string;
