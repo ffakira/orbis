@@ -1,3 +1,4 @@
+import { RestaurantLocation } from "#modules/restaurants/domain/restaurant-location.js";
 import {
   restaurantSchema,
   type CreateRestaurantProps,
@@ -7,6 +8,7 @@ export class Restaurant {
   private constructor(
     public readonly id: string,
     public readonly name: string,
+    public readonly location: RestaurantLocation | null,
     public readonly createdAt: string,
     public readonly updatedAt: string,
   ) {}
@@ -17,6 +19,7 @@ export class Restaurant {
     return new Restaurant(
       validated.id,
       validated.name,
+      validated.location ? RestaurantLocation.create(validated.location) : null,
       validated.createdAt,
       validated.updatedAt,
     );
