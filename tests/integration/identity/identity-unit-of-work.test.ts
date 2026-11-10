@@ -14,7 +14,7 @@ import {
   emailVerificationTokens,
   outboxEvents,
 } from "#infrastructure/database/schema/index.js";
-import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
+import { EmailAlreadyRegisteredError } from "#modules/identity/application/errors/email-already-registered.error.js";
 import { EmailVerificationRequested } from "#modules/identity/domain/email-verification-requested.event.js";
 import { EmailVerificationToken } from "#modules/identity/domain/email-verification-token.js";
 import { TermsAcceptance } from "#modules/identity/domain/terms-acceptance.js";

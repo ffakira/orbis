@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { VerifyEmailHandler } from "#modules/identity/application/commands/verify-email.handler.js";
-import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
+import { InvalidEmailVerificationTokenError } from "#modules/identity/application/errors/invalid-email-verification-token.error.js";
 
 import type { IdentityTransaction } from "#modules/identity/application/ports/unit-of-work.js";
 

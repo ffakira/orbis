@@ -22,9 +22,9 @@ import {
   verifyEmailSchema,
   type VerifyEmailCommand,
 } from "#modules/identity/application/commands/verify-email.schema.js";
-import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
-import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
-import { InvalidPasswordResetTokenError } from "#modules/identity/application/invalid-password-reset-token.error.js";
+import { EmailAlreadyRegisteredError } from "#modules/identity/application/errors/email-already-registered.error.js";
+import { InvalidEmailVerificationTokenError } from "#modules/identity/application/errors/invalid-email-verification-token.error.js";
+import { InvalidPasswordResetTokenError } from "#modules/identity/application/errors/invalid-password-reset-token.error.js";
 import { UserProfileNotFoundError } from "#modules/identity/application/queries/get-user-profile.handler.js";
 import { createRequireAuthentication } from "#presentation/http/middleware/require-authentication.js";
 

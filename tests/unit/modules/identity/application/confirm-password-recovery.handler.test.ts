@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ConfirmPasswordRecoveryHandler } from "#modules/identity/application/commands/confirm-password-recovery.handler.js";
-import { InvalidPasswordResetTokenError } from "#modules/identity/application/invalid-password-reset-token.error.js";
+import { InvalidPasswordResetTokenError } from "#modules/identity/application/errors/invalid-password-reset-token.error.js";
 
 import type { IdentityTransaction } from "#modules/identity/application/ports/unit-of-work.js";
 

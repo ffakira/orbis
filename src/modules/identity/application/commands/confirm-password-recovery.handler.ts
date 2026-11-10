@@ -1,4 +1,4 @@
-import { InvalidPasswordResetTokenError } from "#modules/identity/application/invalid-password-reset-token.error.js";
+import { InvalidPasswordResetTokenError } from "#modules/identity/application/errors/invalid-password-reset-token.error.js";
 
 import type { ConfirmPasswordRecoveryCommand } from "#modules/identity/application/commands/confirm-password-recovery.schema.js";
 import type { Clock } from "#modules/identity/application/ports/clock.js";

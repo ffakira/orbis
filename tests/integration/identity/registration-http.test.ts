@@ -1,8 +1,8 @@
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
-import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
-import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
+import { EmailAlreadyRegisteredError } from "#modules/identity/application/errors/email-already-registered.error.js";
+import { InvalidEmailVerificationTokenError } from "#modules/identity/application/errors/invalid-email-verification-token.error.js";
 
 import {
   createTestApp,

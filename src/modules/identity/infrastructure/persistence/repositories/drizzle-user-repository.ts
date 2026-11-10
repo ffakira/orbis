@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { DatabaseExecutor } from "#infrastructure/database/client.js";
 import { users } from "#infrastructure/database/schema/identity.schema.js";
-import { EmailAlreadyRegisteredError } from "#modules/identity/application/email-already-registered.error.js";
+import { EmailAlreadyRegisteredError } from "#modules/identity/application/errors/email-already-registered.error.js";
 
 import type { User } from "#modules/identity/domain/user.js";
 

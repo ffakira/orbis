@@ -1,4 +1,4 @@
-import { InvalidEmailVerificationTokenError } from "#modules/identity/application/invalid-email-verification-token.error.js";
+import { InvalidEmailVerificationTokenError } from "#modules/identity/application/errors/invalid-email-verification-token.error.js";
 
 import type { VerifyEmailCommand } from "#modules/identity/application/commands/verify-email.schema.js";
 import type { Clock } from "#modules/identity/application/ports/clock.js";
